@@ -39,25 +39,34 @@ const Index = () => {
                 </p>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 relative z-10">
                 <Button
                   variant={viewMode === "grid" ? "farm" : "outline"}
                   size="sm"
-                  onClick={() => setViewMode("grid")}
+                  onClick={() => {
+                    console.log("Grid button clicked");
+                    setViewMode("grid");
+                  }}
                 >
                   <Grid className="w-4 h-4" />
                 </Button>
                 <Button
                   variant={viewMode === "list" ? "farm" : "outline"}
                   size="sm"
-                  onClick={() => setViewMode("list")}
+                  onClick={() => {
+                    console.log("List button clicked");
+                    setViewMode("list");
+                  }}
                 >
                   <List className="w-4 h-4" />
                 </Button>
                 <Button
                   variant={viewMode === "map" ? "farm" : "outline"}
                   size="sm"
-                  onClick={() => setViewMode("map")}
+                  onClick={() => {
+                    console.log("Map button clicked");
+                    setViewMode("map");
+                  }}
                 >
                   <Map className="w-4 h-4" />
                 </Button>
