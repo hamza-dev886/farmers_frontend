@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useViewMode } from "@/hooks/useViewMode";
 import { JoinAsFarmerModal } from "@/components/JoinAsFarmerModal";
+import { AuthModal } from "@/components/AuthModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -27,6 +28,7 @@ import type { User, Session } from "@supabase/supabase-js";
 export const Header = () => {
   const { setViewMode } = useViewMode();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -87,7 +89,7 @@ export const Header = () => {
   };
 
   const handleSignInClick = () => {
-    navigate('/auth');
+    setIsAuthModalOpen(true);
   };
 
   return (
@@ -196,6 +198,10 @@ export const Header = () => {
       <JoinAsFarmerModal 
         open={isModalOpen} 
         onOpenChange={setIsModalOpen} 
+      />
+      <AuthModal 
+        open={isAuthModalOpen}
+        onOpenChange={setIsAuthModalOpen}
       />
     </header>
   );
