@@ -96,6 +96,7 @@ export function MapboxAutocomplete({
   };
 
   const handleSuggestionClick = (suggestion: MapboxFeature) => {
+    console.log('Autocomplete suggestion clicked:', suggestion.place_name, 'Coordinates:', suggestion.center);
     onChange(suggestion.place_name, suggestion.center);
     setSuggestions([]);
     setIsOpen(false);

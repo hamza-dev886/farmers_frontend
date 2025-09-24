@@ -18,14 +18,19 @@ export function MapboxMapPreview({ coordinates, className = "" }: MapboxMapPrevi
   useEffect(() => {
     const fetchToken = async () => {
       try {
+        console.log('Fetching Mapbox token...');
         const { data } = await supabase
           .from('config')
           .select('value')
           .eq('key', 'mapbox_token')
           .single();
 
+        console.log('Mapbox token response:', data);
         if (data?.value) {
           setMapboxToken(data.value);
+          console.log('Mapbox token set successfully');
+        } else {
+          console.log('No Mapbox token found in response');
         }
       } catch (error) {
         console.error('Error fetching Mapbox token:', error);
@@ -37,9 +42,19 @@ export function MapboxMapPreview({ coordinates, className = "" }: MapboxMapPrevi
 
   // Initialize map
   useEffect(() => {
-    if (!mapContainer.current || !mapboxToken) return;
+    console.log('Map initialization effect triggered', { 
+      hasContainer: !!mapContainer.current, 
+      hasToken: !!mapboxToken, 
+      coordinates 
+    });
+    
+    if (!mapContainer.current || !mapboxToken) {
+      console.log('Skipping map initialization - missing container or token');
+      return;
+    }
 
     try {
+      console.log('Setting mapbox access token and initializing map...');
       mapboxgl.accessToken = mapboxToken;
 
       // Initialize map
@@ -50,11 +65,14 @@ export function MapboxMapPreview({ coordinates, className = "" }: MapboxMapPrevi
         zoom: 12,
       });
 
+      console.log('Map initialized successfully');
+
       // Add navigation controls
       map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
       // Add marker if coordinates exist
       if (coordinates) {
+        console.log('Adding marker at coordinates:', coordinates);
         marker.current = new mapboxgl.Marker()
           .setLngLat(coordinates)
           .addTo(map.current);
@@ -64,12 +82,13 @@ export function MapboxMapPreview({ coordinates, className = "" }: MapboxMapPrevi
     }
 
     return () => {
+      console.log('Cleaning up map...');
       if (map.current) {
         map.current.remove();
         map.current = null;
       }
     };
-  }, [mapboxToken]);
+  }, [mapboxToken, coordinates]);
 
   // Update map when coordinates change
   useEffect(() => {

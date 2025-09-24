@@ -220,8 +220,10 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                               <MapboxAutocomplete
                                 value={field.value}
                                 onChange={(address, coordinates) => {
+                                  console.log('Form address changed:', address, 'Coordinates:', coordinates);
                                   field.onChange(address);
                                   setFarmCoordinates(coordinates || null);
+                                  console.log('Farm coordinates state set to:', coordinates);
                                 }}
                                 placeholder="Search for your farm address..."
                                 className="min-h-[40px]"
