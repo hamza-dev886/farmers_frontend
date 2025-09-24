@@ -11,9 +11,9 @@ import { useState } from "react";
 export const FilterSidebar = () => {
   const [openSections, setOpenSections] = useState({
     farmType: true,
-    products: false,
-    distance: false,
-    features: false
+    products: true,
+    distance: true,
+    features: true
   });
 
   const toggleSection = (section: keyof typeof openSections) => {
@@ -24,25 +24,25 @@ export const FilterSidebar = () => {
   };
 
   return (
-    <div className="bg-card rounded-lg border p-4 space-y-3">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-sm">Filters</h3>
-        <Button variant="ghost" size="sm" className="text-xs h-6 px-2">
+    <div className="bg-card rounded-lg border p-6 space-y-4">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="font-semibold text-lg">Filters</h3>
+        <Button variant="ghost" size="sm" className="text-sm h-8 px-3">
           Clear All
         </Button>
       </div>
 
       {/* Quick Filters */}
-      <div className="space-y-2">
-        <div className="flex items-center space-x-2">
+      <div className="space-y-3">
+        <div className="flex items-center space-x-3">
           <Checkbox id="organic-quick" />
-          <label htmlFor="organic-quick" className="text-xs">Organic</label>
-          <Badge variant="secondary" className="text-xs h-4 px-1">156</Badge>
+          <label htmlFor="organic-quick" className="text-sm font-medium cursor-pointer">Organic</label>
+          <Badge variant="secondary" className="text-xs h-5 px-2">156</Badge>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-3">
           <Checkbox id="nearby-quick" />
-          <label htmlFor="nearby-quick" className="text-xs">Within 5 miles</label>
-          <Badge variant="secondary" className="text-xs h-4 px-1">89</Badge>
+          <label htmlFor="nearby-quick" className="text-sm font-medium cursor-pointer">Within 5 miles</label>
+          <Badge variant="secondary" className="text-xs h-5 px-2">89</Badge>
         </div>
       </div>
 
