@@ -220,21 +220,18 @@ const AdminDashboard = () => {
 
   const fetchUserEmails = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, role, created_at')
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.functions.invoke('get-user-auth-status');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error from edge function:', error);
+        throw error;
+      }
 
-      // Set email_confirmed_at to null for now since we can't directly access auth.users
-      // In a real implementation, you'd need to use the auth admin API
-      const usersWithEmailStatus = (data || []).map(user => ({
-        ...user,
-        email_confirmed_at: null // This would need to be fetched from auth.users table
-      }));
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to fetch user auth status');
+      }
 
-      setUserEmails(usersWithEmailStatus);
+      setUserEmails(data.data || []);
     } catch (error) {
       console.error('Error fetching user emails:', error);
       toast({
@@ -494,32 +491,30 @@ const AdminDashboard = () => {
     if (!user) return;
 
     try {
-      if (action === 'confirm-email') {
-        // Manually confirm the email by updating auth.users table
-        // Note: This requires admin privileges and direct database access
-        const { error } = await supabase.auth.admin.updateUserById(userId, {
-          email_confirm: true
-        });
+      const actionType = action === 'confirm-email' ? 'confirm' : 'resend';
+      
+      const { data, error } = await supabase.functions.invoke('admin-confirm-email', {
+        body: { 
+          userId,
+          action: actionType
+        }
+      });
 
-        if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: "Email confirmed successfully."
-        });
-      } else if (action === 'resend-email') {
-        // Call edge function to resend confirmation email
-        const { error } = await supabase.functions.invoke('send-confirmation-email', {
-          body: { userId }
-        });
-
-        if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: "Confirmation email sent successfully."
-        });
+      if (error) {
+        console.error('Error in email action:', error);
+        throw error;
       }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Email action failed');
+      }
+
+      toast({
+        title: "Success",
+        description: action === 'confirm-email' 
+          ? "Email confirmed successfully!" 
+          : "Confirmation email resent successfully!",
+      });
 
       // Log admin action
       await supabase.rpc('log_admin_action', {
