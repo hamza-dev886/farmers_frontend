@@ -20,8 +20,8 @@ export const Hero = () => {
         </h1>
         
         <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-          Your digital marketplace connecting farm families with customers who love fresh, 
-          local produce. Support family farms and discover farm events in your community.
+          Easy access to the freshest produce, seasonal fruits, farm-fresh vegetables, 
+          and quality products straight from local family farms to your table.
         </p>
         
         <div className="max-w-2xl mx-auto bg-card/90 backdrop-blur-sm rounded-xl p-6 shadow-farm border border-border/20">
