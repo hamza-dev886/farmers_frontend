@@ -1,121 +1,251 @@
-import { MapPin, Leaf, Store } from "lucide-react";
+import React, { useEffect, useRef, useState } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { MapPin, Leaf, Store, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+
+interface Farm {
+  id: string;
+  name: string;
+  address: string;
+  bio?: string;
+  contact_person: string;
+  email: string;
+  phone?: string;
+  location?: any; // JSON field from Supabase
+}
 
 export const MapView = () => {
-  return (
-    <div className="relative w-full h-[600px] bg-gradient-subtle rounded-lg border border-border overflow-hidden">
-      {/* Map placeholder with grid pattern */}
-      <div className="absolute inset-0 bg-gradient-to-br from-farm-cream to-background">
-        <div className="absolute inset-0 opacity-20">
-          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="0.5"/>
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const [mapboxToken, setMapboxToken] = useState<string>('');
+  const [showTokenInput, setShowTokenInput] = useState(true);
+
+  // Fetch farms from Supabase
+  const { data: farms = [], isLoading } = useQuery({
+    queryKey: ['farms'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('farms')
+        .select('*');
+      
+      if (error) throw error;
+      return data as Farm[];
+    }
+  });
+
+  const initializeMap = (token: string) => {
+    if (!mapContainer.current || map.current) return;
+
+    mapboxgl.accessToken = token;
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [-98.5795, 39.8283], // Center of US
+      zoom: 4,
+    });
+
+    // Add navigation controls
+    map.current.addControl(
+      new mapboxgl.NavigationControl({
+        visualizePitch: true,
+      }),
+      'top-right'
+    );
+
+    // Add farms as markers when map loads
+    map.current.on('load', () => {
+      addFarmMarkers();
+    });
+  };
+
+  const addFarmMarkers = () => {
+    if (!map.current || !farms.length) return;
+
+    farms.forEach((farm) => {
+      // Use location from database or fallback to random coordinates
+      const lat = farm.location?.lat || (39.8283 + (Math.random() - 0.5) * 20);
+      const lng = farm.location?.lng || (-98.5795 + (Math.random() - 0.5) * 40);
+
+      // Create custom marker element
+      const markerElement = document.createElement('div');
+      markerElement.className = 'farm-marker';
+      markerElement.innerHTML = `
+        <div class="w-10 h-10 bg-farm-green rounded-full flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 transition-transform border-2 border-white">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+            <path d="M12 2L3 7l9 5 9-5-9-5z"/>
+            <path d="M3 17l9 5 9-5"/>
+            <path d="M3 12l9 5 9-5"/>
           </svg>
         </div>
-      </div>
-      
-      {/* Mock map markers */}
-      <div className="absolute top-20 left-32">
-        <div className="relative group cursor-pointer">
-          <div className="w-8 h-8 bg-farm-green rounded-full flex items-center justify-center shadow-lg animate-pulse">
-            <Leaf className="w-4 h-4 text-white" />
+      `;
+
+      // Create popup content
+      const popup = new mapboxgl.Popup({
+        offset: 25,
+        className: 'farm-popup'
+      }).setHTML(`
+        <div class="p-4 max-w-xs">
+          <div class="flex items-start justify-between mb-2">
+            <h3 class="font-semibold text-lg text-farm-green">${farm.name}</h3>
+            <div class="flex text-farm-gold">
+              ${'★'.repeat(4)}${'☆'.repeat(1)}
+            </div>
           </div>
-          <Card className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 opacity-0 group-hover:opacity-100 transition-smooth z-10 w-48">
-            <CardContent className="p-3">
-              <h4 className="font-semibold text-sm">Sunny Valley Farm</h4>
-              <p className="text-xs text-muted-foreground">$475,000 • 25 acres</p>
+          <p class="text-sm text-muted-foreground mb-2">${farm.address}</p>
+          ${farm.bio ? `<p class="text-sm mb-3">${farm.bio.substring(0, 100)}${farm.bio.length > 100 ? '...' : ''}</p>` : ''}
+          <div class="flex flex-wrap gap-1 mb-3">
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-farm-green/10 text-farm-green">
+              🥕 Fresh Produce
+            </span>
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-farm-gold/10 text-farm-gold">
+              🚚 Delivery Available
+            </span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-sm text-muted-foreground">Contact: ${farm.contact_person}</span>
+            <button class="px-3 py-1 bg-farm-green text-white rounded-md text-sm hover:bg-farm-green/90 transition-colors">
+              View Farm
+            </button>
+          </div>
+        </div>
+      `);
+
+      // Add marker to map
+      new mapboxgl.Marker(markerElement)
+        .setLngLat([lng, lat])
+        .setPopup(popup)
+        .addTo(map.current!);
+    });
+  };
+
+  useEffect(() => {
+    if (mapboxToken && !map.current) {
+      initializeMap(mapboxToken);
+    }
+  }, [mapboxToken]);
+
+  useEffect(() => {
+    if (map.current && farms.length > 0) {
+      addFarmMarkers();
+    }
+  }, [farms]);
+
+  const handleTokenSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mapboxToken.trim()) {
+      setShowTokenInput(false);
+      initializeMap(mapboxToken);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="relative w-full h-[600px] bg-gradient-subtle rounded-lg border border-border overflow-hidden flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farm-green mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading farms...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-[600px] bg-gradient-subtle rounded-lg border border-border overflow-hidden">
+      {showTokenInput && (
+        <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle className="text-center">Setup Mapbox</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleTokenSubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="mapbox-token">Mapbox Public Token</Label>
+                  <Input
+                    id="mapbox-token"
+                    type="text"
+                    value={mapboxToken}
+                    onChange={(e) => setMapboxToken(e.target.value)}
+                    placeholder="pk.eyJ1IjoieW91cnVzZXJuYW1lIi..."
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Get your free token at{' '}
+                    <a href="https://mapbox.com/" target="_blank" rel="noopener noreferrer" className="text-farm-green hover:underline">
+                      mapbox.com
+                    </a>
+                  </p>
+                </div>
+                <Button type="submit" className="w-full" disabled={!mapboxToken.trim()}>
+                  Load Map
+                </Button>
+              </form>
             </CardContent>
           </Card>
         </div>
-      </div>
-      
-      <div className="absolute top-40 right-28">
-        <div className="relative group cursor-pointer">
-          <div className="w-8 h-8 bg-farm-gold rounded-full flex items-center justify-center shadow-lg animate-pulse">
-            <Store className="w-4 h-4 text-white" />
-          </div>
-          <Card className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 opacity-0 group-hover:opacity-100 transition-smooth z-10 w-48">
-            <CardContent className="p-3">
-              <h4 className="font-semibold text-sm">Heritage Farm Market</h4>
-              <p className="text-xs text-muted-foreground">$185,000 • 2 acres</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-      
-      <div className="absolute bottom-32 left-20">
-        <div className="relative group cursor-pointer">
-          <div className="w-8 h-8 bg-farm-green rounded-full flex items-center justify-center shadow-lg animate-pulse">
-            <Leaf className="w-4 h-4 text-white" />
-          </div>
-          <Card className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-smooth z-10 w-48">
-            <CardContent className="p-3">
-              <h4 className="font-semibold text-sm">Mountain View Dairy</h4>
-              <p className="text-xs text-muted-foreground">$750,000 • 85 acres</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-      
-      <div className="absolute top-28 right-40">
-        <div className="relative group cursor-pointer">
-          <div className="w-8 h-8 bg-farm-gold rounded-full flex items-center justify-center shadow-lg animate-pulse">
-            <Store className="w-4 h-4 text-white" />
-          </div>
-          <Card className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 opacity-0 group-hover:opacity-100 transition-smooth z-10 w-48">
-            <CardContent className="p-3">
-              <h4 className="font-semibold text-sm">Golden Gate Farmstand</h4>
-              <p className="text-xs text-muted-foreground">$220,000 • 1.5 acres</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      )}
+
+      <div ref={mapContainer} className="absolute inset-0 rounded-lg" />
       
       {/* Map controls overlay */}
-      <div className="absolute top-4 left-4 space-y-2">
-        <Button variant="outline" size="sm" className="bg-background/90 backdrop-blur-sm">
+      <div className="absolute top-4 left-4 space-y-2 z-10">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="bg-background/90 backdrop-blur-sm hover:bg-background"
+          onClick={() => {
+            if (map.current && navigator.geolocation) {
+              navigator.geolocation.getCurrentPosition((position) => {
+                map.current?.flyTo({
+                  center: [position.coords.longitude, position.coords.latitude],
+                  zoom: 12
+                });
+              });
+            }
+          }}
+        >
           <MapPin className="w-4 h-4 mr-2" />
-          Current Location
+          My Location
         </Button>
       </div>
       
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4">
+      {/* Farm count and legend */}
+      <div className="absolute bottom-4 left-4 z-10">
         <Card className="bg-background/90 backdrop-blur-sm">
           <CardContent className="p-3">
-            <h4 className="font-semibold text-sm mb-2">Legend</h4>
+            <h4 className="font-semibold text-sm mb-2">Farms Directory</h4>
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-xs">
                 <div className="w-3 h-3 bg-farm-green rounded-full"></div>
-                <span>Working Farms</span>
+                <span>{farms.length} Active Farms</span>
               </div>
               <div className="flex items-center gap-2 text-xs">
-                <div className="w-3 h-3 bg-farm-gold rounded-full"></div>
-                <span>Farmstalls</span>
+                <Leaf className="w-3 h-3 text-farm-green" />
+                <span>Click markers for details</span>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-      
-      {/* Interactive map notice */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <Card className="bg-background/80 backdrop-blur-sm border-dashed border-2 border-farm-green/30">
-          <CardContent className="p-6 text-center">
-            <MapPin className="w-12 h-12 mx-auto mb-4 text-farm-green" />
-            <h3 className="text-lg font-semibold mb-2">Interactive Map Coming Soon</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              This demo shows property markers. A full interactive map with zoom, pan, and search capabilities will be available soon.
-            </p>
-            <Badge variant="secondary">Demo View</Badge>
-          </CardContent>
-        </Card>
+
+      {/* Settings button */}
+      <div className="absolute bottom-4 right-4 z-10">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="bg-background/90 backdrop-blur-sm hover:bg-background"
+          onClick={() => setShowTokenInput(true)}
+        >
+          Settings
+        </Button>
       </div>
     </div>
   );
