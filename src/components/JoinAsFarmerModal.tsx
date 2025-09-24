@@ -73,7 +73,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
           farm_name: data.farmName,
           farm_address: data.farmAddress,
           farm_coordinates: farmCoordinates,
-          firm_bio: data.farmBio,
+          farm_bio: data.farmBio,
           products: data.products,
           approval_status: 'pending',
           user_id: null, // Will be populated when user creates account

@@ -1276,9 +1276,10 @@ export type Database = {
           created_at: string
           email: string
           farm_address: string
+          farm_bio: string | null
+          farm_coordinates: Json | null
           farm_location: Json | null
           farm_name: string
-          firm_bio: string | null
           id: string
           phone: string
           products: string[] | null
@@ -1292,9 +1293,10 @@ export type Database = {
           created_at?: string
           email: string
           farm_address: string
+          farm_bio?: string | null
+          farm_coordinates?: Json | null
           farm_location?: Json | null
           farm_name: string
-          firm_bio?: string | null
           id?: string
           phone: string
           products?: string[] | null
@@ -1308,9 +1310,10 @@ export type Database = {
           created_at?: string
           email?: string
           farm_address?: string
+          farm_bio?: string | null
+          farm_coordinates?: Json | null
           farm_location?: Json | null
           farm_name?: string
-          firm_bio?: string | null
           id?: string
           phone?: string
           products?: string[] | null
