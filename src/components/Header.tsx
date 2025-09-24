@@ -16,7 +16,7 @@ export const Header = () => {
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2">
             <Wheat className="h-8 w-8 text-farm-green" />
-            <span className="text-2xl font-bold text-foreground">FarmFinder</span>
+            <span className="text-2xl font-bold text-foreground">Farmers Stall</span>
           </div>
         </div>
         
@@ -28,21 +28,21 @@ export const Header = () => {
                 <div className="grid gap-3 p-6 w-[400px]">
                   <div className="row-span-3">
                     <NavigationMenuLink className="block p-3 hover:bg-accent rounded-md">
-                      <div className="text-sm font-medium">Working Farms</div>
+                      <div className="text-sm font-medium">Family Farms</div>
                       <p className="text-sm text-muted-foreground">
-                        Explore active agricultural operations
+                        Discover local family-owned farms
                       </p>
                     </NavigationMenuLink>
                     <NavigationMenuLink className="block p-3 hover:bg-accent rounded-md">
-                      <div className="text-sm font-medium">Farmstalls</div>
+                      <div className="text-sm font-medium">Farm Stalls</div>
                       <p className="text-sm text-muted-foreground">
-                        Local farm shops and markets
+                        Local farm markets and fresh produce
                       </p>
                     </NavigationMenuLink>
                     <NavigationMenuLink className="block p-3 hover:bg-accent rounded-md">
-                      <div className="text-sm font-medium">U-Pick Farms</div>
+                      <div className="text-sm font-medium">Farm Events</div>
                       <p className="text-sm text-muted-foreground">
-                        Pick your own produce experiences
+                        Seasonal events and farm experiences
                       </p>
                     </NavigationMenuLink>
                   </div>
@@ -71,7 +71,7 @@ export const Header = () => {
             Sign In
           </Button>
           <Button variant="farm" className="hidden sm:flex">
-            List Property
+            Join as Farmer
           </Button>
           <Button variant="ghost" size="icon" className="md:hidden">
             <Menu className="h-5 w-5" />

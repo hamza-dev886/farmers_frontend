@@ -15,17 +15,17 @@ export const FilterSidebar = () => {
         <CardContent className="space-y-3">
           <div className="flex items-center space-x-2">
             <Checkbox id="farm" />
-            <label htmlFor="farm" className="text-sm">Working Farms</label>
+            <label htmlFor="farm" className="text-sm">Family Farms</label>
             <Badge variant="secondary" className="ml-auto">156</Badge>
           </div>
           <div className="flex items-center space-x-2">
             <Checkbox id="farmstall" />
-            <label htmlFor="farmstall" className="text-sm">Farmstalls</label>
+            <label htmlFor="farmstall" className="text-sm">Farm Stalls</label>
             <Badge variant="secondary" className="ml-auto">89</Badge>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="upick" />
-            <label htmlFor="upick" className="text-sm">U-Pick Farms</label>
+            <Checkbox id="events" />
+            <label htmlFor="events" className="text-sm">Farm Events</label>
             <Badge variant="secondary" className="ml-auto">34</Badge>
           </div>
         </CardContent>
