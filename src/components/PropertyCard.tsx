@@ -2,6 +2,7 @@ import { Heart, MapPin, Leaf, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
 
 interface PropertyCardProps {
   id: string;
@@ -17,6 +18,7 @@ interface PropertyCardProps {
 }
 
 export const PropertyCard = ({ 
+  id,
   title, 
   type, 
   location, 
@@ -27,8 +29,18 @@ export const PropertyCard = ({
   features,
   isFavorited = false 
 }: PropertyCardProps) => {
+  const navigate = useNavigate();
+
+  const handleCardClick = () => {
+    if (type === 'farm') {
+      navigate(`/farmer/${id}`);
+    }
+  };
   return (
-    <Card className="group hover:shadow-card transition-smooth border-border/50 hover:border-farm-green/30 overflow-hidden">
+    <Card 
+      className="group hover:shadow-card transition-smooth border-border/50 hover:border-farm-green/30 overflow-hidden cursor-pointer"
+      onClick={handleCardClick}
+    >
       <div className="relative">
         <img 
           src={image} 
