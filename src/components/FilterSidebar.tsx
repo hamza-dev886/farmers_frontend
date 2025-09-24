@@ -10,73 +10,91 @@ export const FilterSidebar = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Property Type</CardTitle>
+          <CardTitle className="text-lg">Farm Type</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center space-x-2">
-            <Checkbox id="farm" />
-            <label htmlFor="farm" className="text-sm">Family Farms</label>
+            <Checkbox id="family-farm" />
+            <label htmlFor="family-farm" className="text-sm">Family Farms</label>
             <Badge variant="secondary" className="ml-auto">156</Badge>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="farmstall" />
-            <label htmlFor="farmstall" className="text-sm">Farm Stalls</label>
+            <Checkbox id="farm-stall" />
+            <label htmlFor="farm-stall" className="text-sm">Farm Stalls</label>
             <Badge variant="secondary" className="ml-auto">89</Badge>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="events" />
-            <label htmlFor="events" className="text-sm">Farm Events</label>
+            <Checkbox id="farm-events" />
+            <label htmlFor="farm-events" className="text-sm">Farm Events</label>
             <Badge variant="secondary" className="ml-auto">34</Badge>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Price Range</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="px-3">
-              <Slider
-                defaultValue={[50000, 500000]}
-                max={1000000}
-                min={10000}
-                step={10000}
-                className="w-full"
-              />
-            </div>
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>$50K</span>
-              <span>$500K</span>
-            </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox id="u-pick" />
+            <label htmlFor="u-pick" className="text-sm">U-Pick Experiences</label>
+            <Badge variant="secondary" className="ml-auto">28</Badge>
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Property Size</CardTitle>
+          <CardTitle className="text-lg">Products Available</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center space-x-2">
-            <Checkbox id="small" />
-            <label htmlFor="small" className="text-sm">Under 5 acres</label>
+            <Checkbox id="vegetables" />
+            <label htmlFor="vegetables" className="text-sm">Fresh Vegetables</label>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="medium" />
-            <label htmlFor="medium" className="text-sm">5-50 acres</label>
+            <Checkbox id="fruits" />
+            <label htmlFor="fruits" className="text-sm">Seasonal Fruits</label>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="large" />
-            <label htmlFor="large" className="text-sm">50+ acres</label>
+            <Checkbox id="dairy" />
+            <label htmlFor="dairy" className="text-sm">Dairy Products</label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox id="meat" />
+            <label htmlFor="meat" className="text-sm">Farm-Raised Meat</label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox id="eggs" />
+            <label htmlFor="eggs" className="text-sm">Fresh Eggs</label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox id="flowers" />
+            <label htmlFor="flowers" className="text-sm">Cut Flowers</label>
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Features</CardTitle>
+          <CardTitle className="text-lg">Distance</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center space-x-2">
+            <Checkbox id="nearby" />
+            <label htmlFor="nearby" className="text-sm">Within 5 miles</label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox id="local" />
+            <label htmlFor="local" className="text-sm">Within 15 miles</label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox id="regional" />
+            <label htmlFor="regional" className="text-sm">Within 30 miles</label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox id="delivery" />
+            <label htmlFor="delivery" className="text-sm">Offers Delivery</label>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Farm Features</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center space-x-2">
@@ -84,20 +102,24 @@ export const FilterSidebar = () => {
             <label htmlFor="organic" className="text-sm">Organic Certified</label>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="livestock" />
-            <label htmlFor="livestock" className="text-sm">Livestock</label>
+            <Checkbox id="family-owned" />
+            <label htmlFor="family-owned" className="text-sm">Family Owned</label>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="greenhouse" />
-            <label htmlFor="greenhouse" className="text-sm">Greenhouse</label>
+            <Checkbox id="farm-tours" />
+            <label htmlFor="farm-tours" className="text-sm">Farm Tours</label>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="irrigation" />
-            <label htmlFor="irrigation" className="text-sm">Irrigation System</label>
+            <Checkbox id="csa" />
+            <label htmlFor="csa" className="text-sm">CSA Program</label>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="storage" />
-            <label htmlFor="storage" className="text-sm">Storage Facilities</label>
+            <Checkbox id="seasonal-events" />
+            <label htmlFor="seasonal-events" className="text-sm">Seasonal Events</label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox id="farm-stand" />
+            <label htmlFor="farm-stand" className="text-sm">On-Site Farm Stand</label>
           </div>
         </CardContent>
       </Card>
