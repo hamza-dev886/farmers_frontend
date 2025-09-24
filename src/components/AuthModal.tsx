@@ -23,7 +23,7 @@ const signupSchema = z.object({
   confirmPassword: z.string(),
   fullName: z.string().trim().min(1, { message: "Full name is required" }).max(100, { message: "Name must be less than 100 characters" }),
   phone: z.string().trim().optional(),
-  role: z.enum(['customer', 'farmer', 'admin'], { message: "Please select a valid role" })
+  role: z.enum(['customer', 'farmer'], { message: "Please select a valid role" })
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -296,7 +296,7 @@ export const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
                       <Label htmlFor="signup-role">Account Type</Label>
                       <Select
                         value={signupForm.role}
-                        onValueChange={(value: 'customer' | 'farmer' | 'admin') => 
+                        onValueChange={(value: 'customer' | 'farmer') => 
                           setSignupForm({ ...signupForm, role: value })}
                         disabled={isLoading}
                       >
@@ -308,9 +308,9 @@ export const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
                             <div className="flex items-center gap-2">
                               {getRoleIcon('customer')}
                               <div>
-                                <div className="font-medium">Customer</div>
+                                <div className="font-medium">🛒 Customer</div>
                                 <div className="text-xs text-muted-foreground">
-                                  {getRoleDescription('customer')}
+                                  Browse and purchase fresh local products
                                 </div>
                               </div>
                             </div>
@@ -319,20 +319,9 @@ export const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
                             <div className="flex items-center gap-2">
                               {getRoleIcon('farmer')}
                               <div>
-                                <div className="font-medium">Farmer</div>
+                                <div className="font-medium">🌾 Farmer</div>
                                 <div className="text-xs text-muted-foreground">
-                                  {getRoleDescription('farmer')}
-                                </div>
-                              </div>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="admin">
-                            <div className="flex items-center gap-2">
-                              {getRoleIcon('admin')}
-                              <div>
-                                <div className="font-medium">Administrator</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {getRoleDescription('admin')}
+                                  Sell your farm products directly to customers
                                 </div>
                               </div>
                             </div>
