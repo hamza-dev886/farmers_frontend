@@ -87,20 +87,35 @@ export const Header = () => {
   }, [navigate]);
 
   const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to sign out. Please try again."
-      });
-    } else {
+    try {
+      // Clear the session state immediately for better UX
+      setSession(null);
+      setUser(null);
+      setUserProfile(null);
+      
+      const { error } = await supabase.auth.signOut();
+      
+      // Even if there's an error (like session already expired), 
+      // we still consider it a successful logout since we cleared the local state
       toast({
         title: "Signed out",
         description: "You have been successfully signed out."
       });
-      // Redirect to landing page after successful sign out
+      
+      // Redirect to landing page
       navigate('/');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      // Still clear the state and redirect even if there's an error
+      setSession(null);
+      setUser(null);
+      setUserProfile(null);
+      navigate('/');
+      
+      toast({
+        title: "Signed out",
+        description: "You have been signed out."
+      });
     }
   };
 
