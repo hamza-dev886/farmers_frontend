@@ -173,6 +173,11 @@ export const Header = () => {
                   {userProfile?.role || 'User'}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                {userProfile?.role === 'admin' && (
+                  <DropdownMenuItem onClick={() => navigate('/admin')}>
+                    Admin Dashboard
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem>Profile</DropdownMenuItem>
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
