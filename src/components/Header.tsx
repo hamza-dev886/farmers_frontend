@@ -99,6 +99,8 @@ export const Header = () => {
         title: "Signed out",
         description: "You have been successfully signed out."
       });
+      // Redirect to landing page after successful sign out
+      navigate('/');
     }
   };
 
