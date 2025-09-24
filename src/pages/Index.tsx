@@ -1,15 +1,17 @@
-import { Grid, List, Map } from "lucide-react";
+import { Grid, List, Map, Filter } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { FilterSidebar } from "@/components/FilterSidebar";
 import { PropertyCard } from "@/components/PropertyCard";
 import { FarmCard } from "@/components/FarmCard";
 import { MapView } from "@/components/MapView";
+import { Button } from "@/components/ui/button";
 
 import { mockProperties } from "@/data/mockProperties";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useViewMode } from "@/hooks/useViewMode";
+import { useState } from "react";
 
 interface Farm {
   id: string;
@@ -26,6 +28,7 @@ interface Farm {
 
 const Index = () => {
   const { viewMode, setViewMode } = useViewMode();
+  const [showFilters, setShowFilters] = useState(false);
 
   // Fetch farms from Supabase
   const { data: farms = [], isLoading } = useQuery({
@@ -48,12 +51,14 @@ const Index = () => {
       
       <main className="container mx-auto px-4 py-8">
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Filters Sidebar - show for all views */}
-          <aside className="lg:w-64 xl:w-72 flex-shrink-0">
-            <div className="sticky top-24">
-              <FilterSidebar />
-            </div>
-          </aside>
+          {/* Filters Sidebar - collapsible */}
+          {showFilters && (
+            <aside className="lg:w-64 xl:w-72 flex-shrink-0">
+              <div className="sticky top-24">
+                <FilterSidebar />
+              </div>
+            </aside>
+          )}
           
           {/* Main Content */}
           <div className="flex-1">
@@ -69,52 +74,64 @@ const Index = () => {
                    </p>
                 </div>
                 
-                <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-                  <button
-                    className={`flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      viewMode === "grid" 
-                        ? "bg-farm-green text-white shadow-sm" 
-                        : "text-muted-foreground hover:text-foreground hover:bg-background"
-                    }`}
-                    onClick={() => {
-                      console.log("Grid button clicked - switching to grid view");
-                      setViewMode("grid");
-                    }}
-                  >
-                    <Grid className="w-4 h-4 mr-1" />
-                    Grid
-                  </button>
-                  <button
-                    className={`flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      viewMode === "list" 
-                        ? "bg-farm-green text-white shadow-sm" 
-                        : "text-muted-foreground hover:text-foreground hover:bg-background"
-                    }`}
-                    onClick={() => {
-                      console.log("List button clicked - switching to list view");
-                      setViewMode("list");
-                    }}
-                  >
-                    <List className="w-4 h-4 mr-1" />
-                    List
-                  </button>
-                  <button
-                    className={`flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      viewMode === "map" 
-                        ? "bg-farm-green text-white shadow-sm" 
-                        : "text-muted-foreground hover:text-foreground hover:bg-background"
-                    }`}
-                    onClick={() => {
-                      console.log("Map button clicked - switching to map view");
-                      setViewMode("map");
-                    }}
-                  >
-                    <Map className="w-4 h-4 mr-1" />
-                    Map
-                  </button>
-                </div>
-              </div>
-            </div>
+                 <div className="flex items-center gap-2">
+                   <Button
+                     variant={showFilters ? "default" : "outline"}
+                     size="sm"
+                     onClick={() => setShowFilters(!showFilters)}
+                     className="flex items-center gap-2"
+                   >
+                     <Filter className="w-4 h-4" />
+                     Filters
+                   </Button>
+                   
+                   <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                     <button
+                       className={`flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                         viewMode === "grid" 
+                           ? "bg-farm-green text-white shadow-sm" 
+                           : "text-muted-foreground hover:text-foreground hover:bg-background"
+                       }`}
+                       onClick={() => {
+                         console.log("Grid button clicked - switching to grid view");
+                         setViewMode("grid");
+                       }}
+                     >
+                       <Grid className="w-4 h-4 mr-1" />
+                       Grid
+                     </button>
+                     <button
+                       className={`flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                         viewMode === "list" 
+                           ? "bg-farm-green text-white shadow-sm" 
+                           : "text-muted-foreground hover:text-foreground hover:bg-background"
+                       }`}
+                       onClick={() => {
+                         console.log("List button clicked - switching to list view");
+                         setViewMode("list");
+                       }}
+                     >
+                       <List className="w-4 h-4 mr-1" />
+                       List
+                     </button>
+                     <button
+                       className={`flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                         viewMode === "map" 
+                           ? "bg-farm-green text-white shadow-sm" 
+                           : "text-muted-foreground hover:text-foreground hover:bg-background"
+                       }`}
+                       onClick={() => {
+                         console.log("Map button clicked - switching to map view");
+                         setViewMode("map");
+                       }}
+                     >
+                       <Map className="w-4 h-4 mr-1" />
+                       Map
+                     </button>
+                   </div>
+                 </div>
+               </div>
+             </div>
             
             {/* Content based on view mode */}
             {viewMode === "map" ? (
