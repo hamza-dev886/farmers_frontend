@@ -312,19 +312,19 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                 {/* Submit Button */}
                 <div className="flex justify-center gap-3 pt-4 border-t">
                   <Button 
+                    type="submit" 
+                    disabled={isSubmitting}
+                    className="min-w-[150px] bg-gradient-to-r from-farm-green to-farm-green-light hover:from-farm-green-light hover:to-farm-green transition-smooth"
+                  >
+                    {isSubmitting ? "Submitting..." : "Submit Application"}
+                  </Button>
+                  <Button 
                     type="button" 
                     variant="outline"
                     onClick={() => onOpenChange(false)}
                     disabled={isSubmitting}
                   >
                     Cancel
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    disabled={isSubmitting}
-                    className="min-w-[150px] bg-gradient-to-r from-farm-green to-farm-green-light hover:from-farm-green-light hover:to-farm-green transition-smooth"
-                  >
-                    {isSubmitting ? "Submitting..." : "Submit Application"}
                   </Button>
                 </div>
               </form>
