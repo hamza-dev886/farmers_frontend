@@ -29,47 +29,61 @@ const Index = () => {
           {/* Main Content */}
           <div className="flex-1">
             {/* View Controls */}
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-foreground">
-                  {mockProperties.length} Farm Listings
-                </h2>
-                <p className="text-muted-foreground">
-                  Family farms and farm stalls in your area
-                </p>
-              </div>
-              
-              <div className="flex items-center gap-2 relative z-10">
-                <Button
-                  variant={viewMode === "grid" ? "farm" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    console.log("Grid button clicked");
-                    setViewMode("grid");
-                  }}
-                >
-                  <Grid className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant={viewMode === "list" ? "farm" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    console.log("List button clicked");
-                    setViewMode("list");
-                  }}
-                >
-                  <List className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant={viewMode === "map" ? "farm" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    console.log("Map button clicked");
-                    setViewMode("map");
-                  }}
-                >
-                  <Map className="w-4 h-4" />
-                </Button>
+            <div className="bg-card rounded-lg border p-4 mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground">
+                    {mockProperties.length} Farm Listings
+                  </h2>
+                  <p className="text-muted-foreground">
+                    Family farms and farm stalls in your area
+                  </p>
+                </div>
+                
+                <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                  <button
+                    className={`flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      viewMode === "grid" 
+                        ? "bg-farm-green text-white shadow-sm" 
+                        : "text-muted-foreground hover:text-foreground hover:bg-background"
+                    }`}
+                    onClick={() => {
+                      console.log("Grid button clicked - switching to grid view");
+                      setViewMode("grid");
+                    }}
+                  >
+                    <Grid className="w-4 h-4 mr-1" />
+                    Grid
+                  </button>
+                  <button
+                    className={`flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      viewMode === "list" 
+                        ? "bg-farm-green text-white shadow-sm" 
+                        : "text-muted-foreground hover:text-foreground hover:bg-background"
+                    }`}
+                    onClick={() => {
+                      console.log("List button clicked - switching to list view");
+                      setViewMode("list");
+                    }}
+                  >
+                    <List className="w-4 h-4 mr-1" />
+                    List
+                  </button>
+                  <button
+                    className={`flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      viewMode === "map" 
+                        ? "bg-farm-green text-white shadow-sm" 
+                        : "text-muted-foreground hover:text-foreground hover:bg-background"
+                    }`}
+                    onClick={() => {
+                      console.log("Map button clicked - switching to map view");
+                      setViewMode("map");
+                    }}
+                  >
+                    <Map className="w-4 h-4 mr-1" />
+                    Map
+                  </button>
+                </div>
               </div>
             </div>
             
