@@ -56,6 +56,11 @@ export const Header = () => {
                 .single();
               setUserProfile(profile);
               
+              // Redirect admin users to admin dashboard
+              if (profile?.role === 'admin' && window.location.pathname === '/') {
+                navigate('/admin');
+              }
+              
               // Check if password is expired and show password change modal
               if (profile?.password_expired && !isPasswordChangeModalOpen) {
                 setIsPasswordChangeModalOpen(true);
@@ -77,7 +82,7 @@ export const Header = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -109,50 +114,53 @@ export const Header = () => {
           </div>
         </div>
         
-        <NavigationMenu className="hidden md:flex">
-          <NavigationMenuList>
-            <NavigationMenuItem>
-              <NavigationMenuTrigger>Browse</NavigationMenuTrigger>
-              <NavigationMenuContent>
-                <div className="grid gap-3 p-6 w-[400px]">
-                  <div className="row-span-3">
-                    <NavigationMenuLink className="block p-3 hover:bg-accent rounded-md">
-                      <div className="text-sm font-medium">Family Farms</div>
-                      <p className="text-sm text-muted-foreground">
-                        Discover local family-owned farms
-                      </p>
-                    </NavigationMenuLink>
-                    <NavigationMenuLink className="block p-3 hover:bg-accent rounded-md">
-                      <div className="text-sm font-medium">Farm Stalls</div>
-                      <p className="text-sm text-muted-foreground">
-                        Local farm markets and fresh produce
-                      </p>
-                    </NavigationMenuLink>
-                    <NavigationMenuLink className="block p-3 hover:bg-accent rounded-md">
-                      <div className="text-sm font-medium">Farm Events</div>
-                      <p className="text-sm text-muted-foreground">
-                        Seasonal events and farm experiences
-                      </p>
-                    </NavigationMenuLink>
+        {/* Hide navigation menu for admin users */}
+        {userProfile?.role !== 'admin' && (
+          <NavigationMenu className="hidden md:flex">
+            <NavigationMenuList>
+              <NavigationMenuItem>
+                <NavigationMenuTrigger>Browse</NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <div className="grid gap-3 p-6 w-[400px]">
+                    <div className="row-span-3">
+                      <NavigationMenuLink className="block p-3 hover:bg-accent rounded-md">
+                        <div className="text-sm font-medium">Family Farms</div>
+                        <p className="text-sm text-muted-foreground">
+                          Discover local family-owned farms
+                        </p>
+                      </NavigationMenuLink>
+                      <NavigationMenuLink className="block p-3 hover:bg-accent rounded-md">
+                        <div className="text-sm font-medium">Farm Stalls</div>
+                        <p className="text-sm text-muted-foreground">
+                          Local farm markets and fresh produce
+                        </p>
+                      </NavigationMenuLink>
+                      <NavigationMenuLink className="block p-3 hover:bg-accent rounded-md">
+                        <div className="text-sm font-medium">Farm Events</div>
+                        <p className="text-sm text-muted-foreground">
+                          Seasonal events and farm experiences
+                        </p>
+                      </NavigationMenuLink>
+                    </div>
                   </div>
-                </div>
-              </NavigationMenuContent>
-            </NavigationMenuItem>
-            <NavigationMenuItem>
-              <NavigationMenuLink 
-                className="px-4 py-2 hover:text-farm-green transition-smooth cursor-pointer"
-                onClick={() => setViewMode('map')}
-              >
-                Map View
-              </NavigationMenuLink>
-            </NavigationMenuItem>
-            <NavigationMenuItem>
-              <NavigationMenuLink className="px-4 py-2 hover:text-farm-green transition-smooth">
-                About
-              </NavigationMenuLink>
-            </NavigationMenuItem>
-          </NavigationMenuList>
-        </NavigationMenu>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+              <NavigationMenuItem>
+                <NavigationMenuLink 
+                  className="px-4 py-2 hover:text-farm-green transition-smooth cursor-pointer"
+                  onClick={() => setViewMode('map')}
+                >
+                  Map View
+                </NavigationMenuLink>
+              </NavigationMenuItem>
+              <NavigationMenuItem>
+                <NavigationMenuLink className="px-4 py-2 hover:text-farm-green transition-smooth">
+                  About
+                </NavigationMenuLink>
+              </NavigationMenuItem>
+            </NavigationMenuList>
+          </NavigationMenu>
+        )}
         
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" className="hidden sm:flex">
@@ -194,13 +202,16 @@ export const Header = () => {
             </Button>
           )}
           
-          <Button 
-            variant="farm" 
-            className="hidden sm:flex"
-            onClick={() => setIsModalOpen(true)}
-          >
-            Join as Farmer
-          </Button>
+          {/* Hide "Join as Farmer" button for admin users */}
+          {userProfile?.role !== 'admin' && (
+            <Button 
+              variant="farm" 
+              className="hidden sm:flex"
+              onClick={() => setIsModalOpen(true)}
+            >
+              Join as Farmer
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="md:hidden">
             <Menu className="h-5 w-5" />
           </Button>

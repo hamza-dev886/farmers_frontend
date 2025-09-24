@@ -13,7 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useViewMode } from "@/hooks/useViewMode";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface Farm {
   id: string;
@@ -32,6 +33,27 @@ const Index = () => {
   const { viewMode, setViewMode } = useViewMode();
   const [showFilters, setShowFilters] = useState(false);
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+
+  // Check if user is admin and redirect
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (profile?.role === 'admin') {
+          navigate('/admin');
+        }
+      }
+    };
+    
+    checkAdminStatus();
+  }, [navigate]);
 
   // Fetch farms from Supabase
   const { data: farms = [], isLoading } = useQuery({

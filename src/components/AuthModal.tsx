@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 import { z } from 'zod';
 import { User, UserPlus, Sprout, Wheat } from "lucide-react";
 
@@ -40,6 +41,7 @@ interface AuthModalProps {
 
 export const AuthModal = ({ open, onOpenChange, onOpenFarmerModal }: AuthModalProps) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
 
@@ -90,6 +92,22 @@ export const AuthModal = ({ open, onOpenChange, onOpenFarmerModal }: AuthModalPr
           });
         }
         return;
+      }
+
+      // Check user role and redirect if admin
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (profile?.role === 'admin') {
+          onOpenChange(false);
+          navigate('/admin');
+          return;
+        }
       }
 
       toast({
