@@ -54,14 +54,12 @@ const Index = () => {
       
       <main className="container mx-auto px-4 py-8">
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Desktop Filters Sidebar */}
-          {showFilters && !isMobile && (
-            <aside className="w-64 xl:w-72 flex-shrink-0">
-              <div className="sticky top-24">
-                <FilterSidebar />
-              </div>
-            </aside>
-          )}
+          {/* Desktop Filters Sidebar - Always visible */}
+          <aside className="hidden lg:block w-64 xl:w-72 flex-shrink-0">
+            <div className="sticky top-24">
+              <FilterSidebar />
+            </div>
+          </aside>
           
           {/* Mobile Filters Sheet */}
           <Sheet open={showFilters && isMobile} onOpenChange={(open) => !open && setShowFilters(false)}>
@@ -87,15 +85,18 @@ const Index = () => {
                 </div>
                 
                  <div className="flex items-center gap-2">
-                   <Button
-                     variant={showFilters ? "default" : "outline"}
-                     size="sm"
-                     onClick={() => setShowFilters(!showFilters)}
-                     className="flex items-center gap-2"
-                   >
-                     <Filter className="w-4 h-4" />
-                     Filters
-                   </Button>
+                   {/* Only show filter button on mobile */}
+                   {isMobile && (
+                     <Button
+                       variant={showFilters ? "default" : "outline"}
+                       size="sm"
+                       onClick={() => setShowFilters(!showFilters)}
+                       className="flex items-center gap-2"
+                     >
+                       <Filter className="w-4 h-4" />
+                       Filters
+                     </Button>
+                   )}
                    
                    <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
                      <button
