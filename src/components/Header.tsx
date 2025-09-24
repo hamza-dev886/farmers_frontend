@@ -8,8 +8,11 @@ import {
   NavigationMenuList, 
   NavigationMenuTrigger 
 } from "@/components/ui/navigation-menu";
+import { useViewMode } from "@/hooks/useViewMode";
 
 export const Header = () => {
+  const { setViewMode } = useViewMode();
+
   return (
     <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -50,7 +53,10 @@ export const Header = () => {
               </NavigationMenuContent>
             </NavigationMenuItem>
             <NavigationMenuItem>
-              <NavigationMenuLink className="px-4 py-2 hover:text-farm-green transition-smooth">
+              <NavigationMenuLink 
+                className="px-4 py-2 hover:text-farm-green transition-smooth cursor-pointer"
+                onClick={() => setViewMode('map')}
+              >
                 Map View
               </NavigationMenuLink>
             </NavigationMenuItem>

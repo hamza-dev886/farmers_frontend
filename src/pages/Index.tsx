@@ -1,16 +1,14 @@
-import { useState } from "react";
 import { Grid, List, Map } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { FilterSidebar } from "@/components/FilterSidebar";
 import { PropertyCard } from "@/components/PropertyCard";
 import { MapView } from "@/components/MapView";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { mockProperties } from "@/data/mockProperties";
+import { useViewMode } from "@/hooks/useViewMode";
 
 const Index = () => {
-  const [viewMode, setViewMode] = useState<"grid" | "list" | "map">("grid");
+  const { viewMode, setViewMode } = useViewMode();
 
   return (
     <div className="min-h-screen bg-background">
