@@ -23,7 +23,7 @@ const signupSchema = z.object({
   confirmPassword: z.string(),
   fullName: z.string().trim().min(1, { message: "Full name is required" }).max(100, { message: "Name must be less than 100 characters" }),
   phone: z.string().trim().optional(),
-  role: z.enum(['shopper', 'farmer', 'admin'], { message: "Please select a valid role" })
+  role: z.enum(['customer', 'farmer', 'admin'], { message: "Please select a valid role" })
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -52,7 +52,7 @@ const Auth = () => {
     confirmPassword: '',
     fullName: '',
     phone: '',
-    role: 'shopper'
+    role: 'customer'
   });
   const [signupErrors, setSignupErrors] = useState<Record<string, string>>({});
 
@@ -213,7 +213,7 @@ const Auth = () => {
         return 'Manage the platform and oversee operations';
       case 'farmer':
         return 'List your farm and sell products directly to customers';
-      case 'shopper':
+      case 'customer':
         return 'Browse farms and purchase fresh local products';
       default:
         return '';
@@ -299,7 +299,7 @@ const Auth = () => {
                       <Label htmlFor="signup-role">Account Type</Label>
                       <Select
                         value={signupForm.role}
-                        onValueChange={(value: 'shopper' | 'farmer' | 'admin') => 
+                        onValueChange={(value: 'customer' | 'farmer' | 'admin') => 
                           setSignupForm({ ...signupForm, role: value })}
                         disabled={isLoading}
                       >
@@ -307,13 +307,13 @@ const Auth = () => {
                           <SelectValue placeholder="Select your role" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="shopper">
+                          <SelectItem value="customer">
                             <div className="flex items-center gap-2">
-                              {getRoleIcon('shopper')}
+                              {getRoleIcon('customer')}
                               <div>
                                 <div className="font-medium">Customer</div>
                                 <div className="text-xs text-muted-foreground">
-                                  {getRoleDescription('shopper')}
+                                  {getRoleDescription('customer')}
                                 </div>
                               </div>
                             </div>
