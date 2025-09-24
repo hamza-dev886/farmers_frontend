@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,58 +12,73 @@ export function MapboxMapPreview({ coordinates, className = "" }: MapboxMapPrevi
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
+  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
 
+  // Fetch Mapbox token
   useEffect(() => {
-    const initializeMap = async () => {
-      if (!mapContainer.current) return;
-
+    const fetchToken = async () => {
       try {
-        // Fetch Mapbox token
         const { data } = await supabase
           .from('config')
           .select('value')
           .eq('key', 'mapbox_token')
           .single();
 
-        if (!data?.value) return;
-
-        mapboxgl.accessToken = data.value;
-
-        // Initialize map
-        map.current = new mapboxgl.Map({
-          container: mapContainer.current,
-          style: 'mapbox://styles/mapbox/light-v11',
-          center: coordinates || [-74.006, 40.7128], // Default to NYC
-          zoom: 12,
-        });
-
-        // Add navigation controls
-        map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
-
-        // Add marker if coordinates exist
-        if (coordinates) {
-          marker.current = new mapboxgl.Marker()
-            .setLngLat(coordinates)
-            .addTo(map.current);
+        if (data?.value) {
+          setMapboxToken(data.value);
         }
       } catch (error) {
-        console.error('Error initializing map:', error);
+        console.error('Error fetching Mapbox token:', error);
       }
     };
-
-    initializeMap();
-
-    return () => {
-      map.current?.remove();
-    };
+    
+    fetchToken();
   }, []);
 
+  // Initialize map
+  useEffect(() => {
+    if (!mapContainer.current || !mapboxToken) return;
+
+    try {
+      mapboxgl.accessToken = mapboxToken;
+
+      // Initialize map
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/light-v11',
+        center: coordinates || [-74.006, 40.7128], // Default to NYC
+        zoom: 12,
+      });
+
+      // Add navigation controls
+      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+      // Add marker if coordinates exist
+      if (coordinates) {
+        marker.current = new mapboxgl.Marker()
+          .setLngLat(coordinates)
+          .addTo(map.current);
+      }
+    } catch (error) {
+      console.error('Error initializing map:', error);
+    }
+
+    return () => {
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
+    };
+  }, [mapboxToken]);
+
+  // Update map when coordinates change
   useEffect(() => {
     if (map.current && coordinates) {
       // Update map center and marker
       map.current.flyTo({
         center: coordinates,
         zoom: 12,
+        duration: 1000
       });
 
       // Remove existing marker
