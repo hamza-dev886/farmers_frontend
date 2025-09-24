@@ -26,6 +26,8 @@ export const MapView = () => {
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [showTokenInput, setShowTokenInput] = useState(true);
+  const [mapError, setMapError] = useState<string>('');
+  const [isInitializing, setIsInitializing] = useState(false);
 
   // Fetch farms from Supabase
   const { data: farms = [], isLoading } = useQuery({
@@ -43,27 +45,52 @@ export const MapView = () => {
   const initializeMap = (token: string) => {
     if (!mapContainer.current || map.current) return;
 
-    mapboxgl.accessToken = token;
-    
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center: [-98.5795, 39.8283], // Center of US
-      zoom: 4,
-    });
+    setIsInitializing(true);
+    setMapError('');
 
-    // Add navigation controls
-    map.current.addControl(
-      new mapboxgl.NavigationControl({
-        visualizePitch: true,
-      }),
-      'top-right'
-    );
+    try {
+      mapboxgl.accessToken = token;
+      
+      // Check WebGL support
+      if (!mapboxgl.supported()) {
+        throw new Error('WebGL is not supported by this browser. Please try a different browser or update your current one.');
+      }
+      
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: [-98.5795, 39.8283], // Center of US
+        zoom: 4,
+        antialias: true,
+        preserveDrawingBuffer: false,
+        failIfMajorPerformanceCaveat: false,
+      });
 
-    // Add farms as markers when map loads
-    map.current.on('load', () => {
-      addFarmMarkers();
-    });
+      // Add navigation controls
+      map.current.addControl(
+        new mapboxgl.NavigationControl({
+          visualizePitch: true,
+        }),
+        'top-right'
+      );
+
+      // Handle map load and errors
+      map.current.on('load', () => {
+        setIsInitializing(false);
+        addFarmMarkers();
+      });
+
+      map.current.on('error', (e) => {
+        console.error('Mapbox error:', e);
+        setMapError('Failed to load the map. Please check your token and try again.');
+        setIsInitializing(false);
+      });
+
+    } catch (error) {
+      console.error('Map initialization error:', error);
+      setMapError(error instanceof Error ? error.message : 'Failed to initialize map');
+      setIsInitializing(false);
+    }
   };
 
   const addFarmMarkers = () => {
@@ -142,6 +169,7 @@ export const MapView = () => {
     e.preventDefault();
     if (mapboxToken.trim()) {
       setShowTokenInput(false);
+      setMapError('');
       initializeMap(mapboxToken);
     }
   };
@@ -159,6 +187,38 @@ export const MapView = () => {
 
   return (
     <div className="relative w-full h-[600px] bg-gradient-subtle rounded-lg border border-border overflow-hidden">
+      {mapError && (
+        <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle className="text-center text-destructive">Map Error</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-4">
+              <p className="text-sm text-muted-foreground">{mapError}</p>
+              <Button onClick={() => {
+                setMapError('');
+                setShowTokenInput(true);
+                if (map.current) {
+                  map.current.remove();
+                  map.current = null;
+                }
+              }}>
+                Try Again
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {isInitializing && (
+        <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-40">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farm-green mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Initializing map...</p>
+          </div>
+        </div>
+      )}
+
       {showTokenInput && (
         <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
