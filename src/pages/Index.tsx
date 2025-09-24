@@ -47,9 +47,9 @@ const Index = () => {
       <Hero />
       
       <main className="container mx-auto px-4 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Filters Sidebar - show for all views */}
-          <aside className="lg:w-80 flex-shrink-0">
+          <aside className="lg:w-64 xl:w-72 flex-shrink-0">
             <div className="sticky top-24">
               <FilterSidebar />
             </div>
