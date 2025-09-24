@@ -220,7 +220,7 @@ export const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
           <DialogTitle className="text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
               <Sprout className="h-6 w-6 text-farm-green" />
-              <span className="text-xl font-bold text-farm-green">Farm Connect</span>
+              <span className="text-xl font-bold text-farm-green">Farmers Stall</span>
             </div>
           </DialogTitle>
         </DialogHeader>
