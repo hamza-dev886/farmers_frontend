@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from 'zod';
-import { User, UserPlus, Sprout } from "lucide-react";
+import { User, UserPlus, Sprout, Wheat } from "lucide-react";
 
 // Validation schemas
 const loginSchema = z.object({
@@ -219,8 +219,8 @@ export const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
         <DialogHeader>
           <DialogTitle className="text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <Sprout className="h-6 w-6 text-farm-green" />
-              <span className="text-xl font-bold text-farm-green">Farmers Stall</span>
+              <Wheat className="h-8 w-8 text-farm-green" />
+              <span className="text-2xl font-bold text-foreground">Farmers Stall</span>
             </div>
           </DialogTitle>
         </DialogHeader>
