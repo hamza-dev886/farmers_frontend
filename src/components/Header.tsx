@@ -56,9 +56,11 @@ export const Header = () => {
                 .single();
               setUserProfile(profile);
               
-              // Redirect admin users to admin dashboard
+              // Redirect users based on their role
               if (profile?.role === 'admin' && window.location.pathname === '/') {
                 navigate('/admin');
+              } else if (profile?.role === 'farmer' && window.location.pathname === '/') {
+                navigate('/farmer-dashboard');
               }
               
               // Check if password is expired and show password change modal
@@ -114,8 +116,8 @@ export const Header = () => {
           </div>
         </div>
         
-        {/* Hide navigation menu for admin users */}
-        {userProfile?.role !== 'admin' && (
+        {/* Hide navigation menu for admin and farmer users */}
+        {userProfile?.role !== 'admin' && userProfile?.role !== 'farmer' && (
           <NavigationMenu className="hidden md:flex">
             <NavigationMenuList>
               <NavigationMenuItem>
@@ -186,6 +188,11 @@ export const Header = () => {
                     Admin Dashboard
                   </DropdownMenuItem>
                 )}
+                {userProfile?.role === 'farmer' && (
+                  <DropdownMenuItem onClick={() => navigate('/farmer-dashboard')}>
+                    Farmer Dashboard
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem>Profile</DropdownMenuItem>
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -202,8 +209,8 @@ export const Header = () => {
             </Button>
           )}
           
-          {/* Hide "Join as Farmer" button for admin users */}
-          {userProfile?.role !== 'admin' && (
+          {/* Hide "Join as Farmer" button for admin and farmer users */}
+          {userProfile?.role !== 'admin' && userProfile?.role !== 'farmer' && (
             <Button 
               variant="farm" 
               className="hidden sm:flex"

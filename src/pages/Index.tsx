@@ -35,9 +35,9 @@ const Index = () => {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
 
-  // Check if user is admin and redirect
+  // Check if user is admin or farmer and redirect
   useEffect(() => {
-    const checkAdminStatus = async () => {
+    const checkUserRole = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const { data: profile } = await supabase
@@ -48,11 +48,13 @@ const Index = () => {
         
         if (profile?.role === 'admin') {
           navigate('/admin');
+        } else if (profile?.role === 'farmer') {
+          navigate('/farmer-dashboard');
         }
       }
     };
     
-    checkAdminStatus();
+    checkUserRole();
   }, [navigate]);
 
   // Fetch farms from Supabase

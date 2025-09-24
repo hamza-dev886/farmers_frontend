@@ -94,7 +94,7 @@ export const AuthModal = ({ open, onOpenChange, onOpenFarmerModal }: AuthModalPr
         return;
       }
 
-      // Check user role and redirect if admin
+      // Check user role and redirect accordingly
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const { data: profile } = await supabase
@@ -106,6 +106,10 @@ export const AuthModal = ({ open, onOpenChange, onOpenFarmerModal }: AuthModalPr
         if (profile?.role === 'admin') {
           onOpenChange(false);
           navigate('/admin');
+          return;
+        } else if (profile?.role === 'farmer') {
+          onOpenChange(false);
+          navigate('/farmer-dashboard');
           return;
         }
       }
