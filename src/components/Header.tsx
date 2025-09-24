@@ -102,20 +102,22 @@ export const Header = () => {
         description: "You have been successfully signed out."
       });
       
-      // Redirect to landing page
-      navigate('/');
+      // Force refresh the page to completely destroy the session
+      window.location.href = '/';
     } catch (error) {
       console.error('Sign out error:', error);
       // Still clear the state and redirect even if there's an error
       setSession(null);
       setUser(null);
       setUserProfile(null);
-      navigate('/');
       
       toast({
         title: "Signed out",
         description: "You have been signed out."
       });
+      
+      // Force refresh the page
+      window.location.href = '/';
     }
   };
 
