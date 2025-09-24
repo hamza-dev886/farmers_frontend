@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle, XCircle, Eye, Clock, Users, FileText, TrendingUp, Plus, Edit, Trash } from "lucide-react";
+import { CheckCircle, XCircle, Eye, Clock, Users, FileText, TrendingUp, Plus, Edit, Trash, Mail, Send } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { User } from "@supabase/supabase-js";
 
@@ -65,6 +65,15 @@ interface PricingPlan {
   updated_at: string;
 }
 
+interface UserEmail {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  email_confirmed_at: string | null;
+  created_at: string;
+}
+
 interface FarmerPlanAssignment {
   user_id: string;
   user_email: string;
@@ -88,6 +97,7 @@ const AdminDashboard = () => {
   const [applications, setApplications] = useState<FarmerApplication[]>([]);
   const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([]);
   const [farmerPlans, setFarmerPlans] = useState<FarmerPlanAssignment[]>([]);
+  const [userEmails, setUserEmails] = useState<UserEmail[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     totalApplications: 0,
     pendingApplications: 0,
@@ -98,7 +108,8 @@ const AdminDashboard = () => {
   const [selectedApplication, setSelectedApplication] = useState<FarmerApplication | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
   const [selectedFarmer, setSelectedFarmer] = useState<FarmerPlanAssignment | null>(null);
-  const [actionType, setActionType] = useState<'approve' | 'reject' | 'delete' | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserEmail | null>(null);
+  const [actionType, setActionType] = useState<'approve' | 'reject' | 'delete' | 'confirm-email' | 'resend-email' | null>(null);
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [planChangeModalOpen, setPlanChangeModalOpen] = useState(false);
   const [planFormData, setPlanFormData] = useState<Partial<PricingPlan>>({});
@@ -144,6 +155,7 @@ const AdminDashboard = () => {
       await fetchApplications();
       await fetchPricingPlans();
       await fetchFarmerPlans();
+      await fetchUserEmails();
     } catch (error) {
       console.error('Error checking auth:', error);
       navigate('/');
@@ -202,6 +214,33 @@ const AdminDashboard = () => {
         variant: "destructive",
         title: "Error",
         description: "Failed to fetch farmer plan assignments."
+      });
+    }
+  };
+
+  const fetchUserEmails = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, role, created_at')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Set email_confirmed_at to null for now since we can't directly access auth.users
+      // In a real implementation, you'd need to use the auth admin API
+      const usersWithEmailStatus = (data || []).map(user => ({
+        ...user,
+        email_confirmed_at: null // This would need to be fetched from auth.users table
+      }));
+
+      setUserEmails(usersWithEmailStatus);
+    } catch (error) {
+      console.error('Error fetching user emails:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch user email data."
       });
     }
   };
@@ -451,6 +490,57 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleEmailAction = async (userId: string, action: 'confirm-email' | 'resend-email') => {
+    if (!user) return;
+
+    try {
+      if (action === 'confirm-email') {
+        // Manually confirm the email by updating auth.users table
+        // Note: This requires admin privileges and direct database access
+        const { error } = await supabase.auth.admin.updateUserById(userId, {
+          email_confirm: true
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Email confirmed successfully."
+        });
+      } else if (action === 'resend-email') {
+        // Call edge function to resend confirmation email
+        const { error } = await supabase.functions.invoke('send-confirmation-email', {
+          body: { userId }
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Confirmation email sent successfully."
+        });
+      }
+
+      // Log admin action
+      await supabase.rpc('log_admin_action', {
+        action_type: `user_email_${action.replace('-', '_')}`,
+        target_user_id: userId,
+        action_details: { action }
+      });
+
+      await fetchUserEmails();
+      setSelectedUser(null);
+      setActionType(null);
+    } catch (error) {
+      console.error(`Error ${action}:`, error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to ${action.replace('-', ' ')}.`
+      });
+    }
+  };
+
   const handleApplicationAction = async (applicationId: string, action: 'approve' | 'reject' | 'delete') => {
     if (!user) return;
 
@@ -637,10 +727,11 @@ const AdminDashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="applications">Farmer Applications</TabsTrigger>
             <TabsTrigger value="pricing">Pricing Plans</TabsTrigger>
             <TabsTrigger value="farmer-plans">Farmer Plan Management</TabsTrigger>
+            <TabsTrigger value="email-management">Email Management</TabsTrigger>
           </TabsList>
           
           {/* Applications Tab */}
@@ -873,6 +964,93 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Email Management Tab */}
+          <TabsContent value="email-management">
+            <Card>
+              <CardHeader>
+                <CardTitle>Email Management</CardTitle>
+                <CardDescription>
+                  Manage user email confirmations and send confirmation emails
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Registered</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {userEmails.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">
+                          {user.full_name || 'N/A'}
+                        </TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{user.role}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={user.email_confirmed_at ? "default" : "destructive"}>
+                            {user.email_confirmed_at ? "Confirmed" : "Unconfirmed"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(user.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            {!user.email_confirmed_at && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    setActionType('confirm-email');
+                                  }}
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Confirm
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    setActionType('resend-email');
+                                  }}
+                                >
+                                  <Send className="h-4 w-4 mr-2" />
+                                  Resend
+                                </Button>
+                              </>
+                            )}
+                            {user.email_confirmed_at && (
+                              <span className="text-sm text-muted-foreground">
+                                Confirmed on {new Date(user.email_confirmed_at).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {userEmails.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No users found.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
         {/* Application Action Confirmation Dialog */}
@@ -905,13 +1083,54 @@ const AdminDashboard = () => {
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => {
-                  if (selectedApplication && actionType) {
+                  if (selectedApplication && actionType && (actionType === 'approve' || actionType === 'reject' || actionType === 'delete')) {
                     handleApplicationAction(selectedApplication.id, actionType);
                   }
                 }}
                 className={actionType === 'approve' ? 'bg-green-600 hover:bg-green-700' : actionType === 'delete' ? 'bg-red-600 hover:bg-red-700' : ''}
               >
                 {actionType === 'approve' ? 'Approve' : actionType === 'reject' ? 'Reject' : 'Delete'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Email Action Confirmation Dialog */}
+        <AlertDialog open={!!(actionType && (actionType === 'confirm-email' || actionType === 'resend-email'))} onOpenChange={() => {
+          setActionType(null);
+          setSelectedUser(null);
+        }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {actionType === 'confirm-email' ? 'Confirm Email' : 'Resend Confirmation Email'}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to {actionType === 'confirm-email' ? 'manually confirm the email for' : 'resend confirmation email to'}{' '}
+                <strong>{selectedUser?.full_name || selectedUser?.email}</strong>?
+                {actionType === 'confirm-email' && (
+                  <span className="block mt-2 text-sm">
+                    This will mark the email as confirmed without requiring user action.
+                  </span>
+                )}
+                {actionType === 'resend-email' && (
+                  <span className="block mt-2 text-sm">
+                    This will send a new confirmation email to the user.
+                  </span>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (selectedUser && actionType && (actionType === 'confirm-email' || actionType === 'resend-email')) {
+                    handleEmailAction(selectedUser.id, actionType);
+                  }
+                }}
+                className={actionType === 'confirm-email' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}
+              >
+                {actionType === 'confirm-email' ? 'Confirm Email' : 'Resend Email'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
