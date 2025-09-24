@@ -29,7 +29,7 @@ type FarmerApplicationForm = z.infer<typeof farmerApplicationSchema>;
 const productOptions = [
   "Fruits", "Vegetables", "Herbs", "Dairy Products", "Eggs", 
   "Meat & Poultry", "Grains & Cereals", "Honey & Bee Products",
-  "Flowers & Plants", "Preserved Foods", "Organic Products"
+  "Flowers & Plants", "Preserved Foods", "Organic Products", "Firewood", "Not Listed"
 ];
 
 interface JoinAsFarmerModalProps {
