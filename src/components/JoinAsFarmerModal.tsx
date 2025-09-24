@@ -6,6 +6,7 @@ import { Wheat, User, Building, Leaf, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { MapboxAutocomplete } from "@/components/ui/mapbox-autocomplete";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,6 +20,7 @@ const farmerApplicationSchema = z.object({
   phone: z.string().min(10, "Please enter a valid phone number"),
   farmName: z.string().min(2, "Farm name must be at least 2 characters"),
   farmAddress: z.string().min(10, "Please provide a detailed address"),
+  farmCoordinates: z.array(z.number()).optional(),
   farmBio: z.string().min(50, "Please provide at least 50 characters describing your farm"),
   products: z.array(z.string()).min(1, "Please select at least one product type"),
   termsAccepted: z.boolean().refine(val => val === true, "You must accept the terms and conditions"),
@@ -39,6 +41,7 @@ interface JoinAsFarmerModalProps {
 
 export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [farmCoordinates, setFarmCoordinates] = useState<[number, number] | null>(null);
   const { toast } = useToast();
 
   const form = useForm<FarmerApplicationForm>({
@@ -49,6 +52,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
       phone: "",
       farmName: "",
       farmAddress: "",
+      farmCoordinates: undefined,
       farmBio: "",
       products: [],
       termsAccepted: false,
@@ -67,6 +71,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
           phone: data.phone,
           farm_name: data.farmName,
           farm_address: data.farmAddress,
+          farm_coordinates: farmCoordinates,
           firm_bio: data.farmBio,
           products: data.products,
           approval_status: 'pending',
@@ -210,10 +215,14 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                         <FormItem>
                           <FormLabel>Farm Address *</FormLabel>
                           <FormControl>
-                            <Textarea 
-                              placeholder="Full address including street, city, state, and postal code"
-                              className="min-h-[100px]"
-                              {...field} 
+                            <MapboxAutocomplete
+                              value={field.value}
+                              onChange={(address, coordinates) => {
+                                field.onChange(address);
+                                setFarmCoordinates(coordinates || null);
+                              }}
+                              placeholder="Search for your farm address..."
+                              className="min-h-[40px]"
                             />
                           </FormControl>
                           <FormMessage />
