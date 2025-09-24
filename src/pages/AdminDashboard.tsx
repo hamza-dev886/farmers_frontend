@@ -600,6 +600,7 @@ const AdminDashboard = () => {
 
           if (farmError) {
             console.error('Error creating farm:', farmError);
+            throw farmError;
           }
 
           // Update user role to farmer
@@ -610,6 +611,29 @@ const AdminDashboard = () => {
 
           if (roleError) {
             console.error('Error updating user role:', roleError);
+            throw roleError;
+          }
+
+          // Assign farmer to free pricing plan
+          const { data: freePlan } = await supabase
+            .from('pricing_plans')
+            .select('id')
+            .eq('name', 'Free (Starter)')
+            .single();
+
+          if (freePlan) {
+            const { error: planError } = await supabase
+              .from('farm_pricing_plans')
+              .insert({
+                user_id: application.user_id,
+                pricing_plan_id: freePlan.id,
+                assigned_by: user?.id,
+                is_active: true
+              });
+
+            if (planError && planError.code !== '23505') { // Ignore duplicate key errors
+              console.error('Error assigning pricing plan:', planError);
+            }
           }
         }
       }

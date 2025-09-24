@@ -116,16 +116,10 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
 
       if (applicationError) throw applicationError;
 
-      // Store temporary password in profiles table for reference
-      await supabase
-        .from('profiles')
-        .update({ temp_password: tempPassword })
-        .eq('id', authData.user.id);
-
       toast({
         title: "Account created successfully!",
-        description: `Your farmer account has been created. Your temporary password is: ${tempPassword}. Please save this and change it on first login.`,
-        duration: 10000,
+        description: `Your farmer account has been created with email: ${data.email}. Your temporary password is: ${tempPassword}. Please save this and change it on first login.`,
+        duration: 15000,
       });
 
       form.reset();
