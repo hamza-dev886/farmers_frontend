@@ -6421,7 +6421,7 @@ export type Database = {
         | "partially_received"
         | "canceled"
       stock_mode: "count" | "always_available"
-      user_role: "shopper" | "farmer" | "admin"
+      user_role: "shopper" | "farmer" | "admin" | "customer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -6573,7 +6573,7 @@ export const Constants = {
         "canceled",
       ],
       stock_mode: ["count", "always_available"],
-      user_role: ["shopper", "farmer", "admin"],
+      user_role: ["shopper", "farmer", "admin", "customer"],
     },
   },
 } as const
