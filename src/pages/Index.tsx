@@ -6,11 +6,13 @@ import { PropertyCard } from "@/components/PropertyCard";
 import { FarmCard } from "@/components/FarmCard";
 import { MapView } from "@/components/MapView";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 import { mockProperties } from "@/data/mockProperties";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useViewMode } from "@/hooks/useViewMode";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useState } from "react";
 
 interface Farm {
@@ -29,6 +31,7 @@ interface Farm {
 const Index = () => {
   const { viewMode, setViewMode } = useViewMode();
   const [showFilters, setShowFilters] = useState(false);
+  const isMobile = useIsMobile();
 
   // Fetch farms from Supabase
   const { data: farms = [], isLoading } = useQuery({
@@ -51,14 +54,23 @@ const Index = () => {
       
       <main className="container mx-auto px-4 py-8">
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Filters Sidebar - collapsible */}
-          {showFilters && (
-            <aside className="lg:w-64 xl:w-72 flex-shrink-0">
+          {/* Desktop Filters Sidebar */}
+          {showFilters && !isMobile && (
+            <aside className="w-64 xl:w-72 flex-shrink-0">
               <div className="sticky top-24">
                 <FilterSidebar />
               </div>
             </aside>
           )}
+          
+          {/* Mobile Filters Sheet */}
+          <Sheet open={showFilters && isMobile} onOpenChange={(open) => !open && setShowFilters(false)}>
+            <SheetContent side="left" className="w-80 p-0">
+              <div className="p-4">
+                <FilterSidebar />
+              </div>
+            </SheetContent>
+          </Sheet>
           
           {/* Main Content */}
           <div className="flex-1">
