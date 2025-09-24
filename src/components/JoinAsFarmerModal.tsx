@@ -326,8 +326,8 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                 <div className="flex justify-center gap-3 pt-4 border-t">
                   <Button 
                     type="submit" 
-                    disabled={isSubmitting}
-                    className="min-w-[150px] bg-gradient-to-r from-farm-green to-farm-green-light hover:from-farm-green-light hover:to-farm-green transition-smooth"
+                    disabled={isSubmitting || !form.watch("termsAccepted")}
+                    className="min-w-[150px] bg-gradient-to-r from-farm-green to-farm-green-light hover:from-farm-green-light hover:to-farm-green transition-smooth disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSubmitting ? "Submitting..." : "Submit Application"}
                   </Button>
