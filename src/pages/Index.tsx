@@ -5,6 +5,7 @@ import { FilterSidebar } from "@/components/FilterSidebar";
 import { PropertyCard } from "@/components/PropertyCard";
 import { FarmCard } from "@/components/FarmCard";
 import { MapView } from "@/components/MapView";
+import { MapFilters } from "@/components/MapFilters";
 import { mockProperties } from "@/data/mockProperties";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -46,16 +47,18 @@ const Index = () => {
       <Hero />
       
       <main className="container mx-auto px-4 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Filters Sidebar */}
-          <aside className="lg:w-80 flex-shrink-0">
-            <div className="sticky top-24">
-              <FilterSidebar />
-            </div>
-          </aside>
+        <div className={viewMode === "map" ? "w-full" : "flex flex-col lg:flex-row gap-8"}>
+          {/* Filters Sidebar - only show for grid/list views */}
+          {viewMode !== "map" && (
+            <aside className="lg:w-80 flex-shrink-0">
+              <div className="sticky top-24">
+                <FilterSidebar />
+              </div>
+            </aside>
+          )}
           
           {/* Main Content */}
-          <div className="flex-1">
+          <div className={viewMode === "map" ? "w-full" : "flex-1"}>
             {/* View Controls */}
             <div className="bg-card rounded-lg border p-4 mb-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -117,7 +120,10 @@ const Index = () => {
             
             {/* Content based on view mode */}
             {viewMode === "map" ? (
-              <MapView />
+              <div className="relative">
+                <MapView />
+                <MapFilters />
+              </div>
             ) : isLoading ? (
               <div className="flex items-center justify-center py-16">
                 <div className="text-center">
