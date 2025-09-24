@@ -7,7 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Eye, Clock, Users, FileText, TrendingUp } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CheckCircle, XCircle, Eye, Clock, Users, FileText, TrendingUp, Plus, Edit, Trash } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { User } from "@supabase/supabase-js";
 
@@ -27,6 +33,38 @@ interface FarmerApplication {
   approved_by: string | null;
 }
 
+interface PricingPlan {
+  id: string;
+  name: string;
+  price: string;
+  billing_cycle: string;
+  max_number_of_product: number;
+  transaction_fee: number;
+  is_active: boolean;
+  can_see_sales_reports: boolean;
+  can_shopper_subscription: boolean;
+  can_accept_pre_order: boolean;
+  can_access_customer_contact_list: boolean;
+  can_create_branded_stall_page: boolean;
+  can_create_custom_coupon: boolean;
+  can_run_custom_promosion: boolean;
+  can_create_multiple_stand: boolean;
+  allowed_to_business_in_multiple_location: boolean;
+  can_access_to_advanced_analytics: boolean;
+  can_eligible_for_priority_map_placement: boolean;
+  can_sale_wholesale_and_bulk: boolean;
+  can_receive_loyalty_rewards: boolean;
+  allowed_to_get_marketing_campaign_credits: boolean;
+  allowed_to_run_event_management_and_ticketing: boolean;
+  access_to_bulk_promotional_tools: boolean;
+  allowed_to_customizable_loyalty_programs: boolean;
+  access_to_advanced_branding_options: boolean;
+  can_have_dedicated_account_manager: boolean;
+  access_to_white_label_option: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 interface DashboardStats {
   totalApplications: number;
   pendingApplications: number;
@@ -38,6 +76,7 @@ const AdminDashboard = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [applications, setApplications] = useState<FarmerApplication[]>([]);
+  const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     totalApplications: 0,
     pendingApplications: 0,
@@ -46,7 +85,12 @@ const AdminDashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [selectedApplication, setSelectedApplication] = useState<FarmerApplication | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
+  const [planModalOpen, setPlanModalOpen] = useState(false);
+  const [planFormData, setPlanFormData] = useState<Partial<PricingPlan>>({});
+  const [editingPlan, setEditingPlan] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("applications");
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -84,6 +128,7 @@ const AdminDashboard = () => {
 
       setIsAdmin(true);
       await fetchApplications();
+      await fetchPricingPlans();
     } catch (error) {
       console.error('Error checking auth:', error);
       navigate('/');
@@ -121,6 +166,159 @@ const AdminDashboard = () => {
         variant: "destructive",
         title: "Error",
         description: "Failed to fetch farmer applications."
+      });
+    }
+  };
+
+  const fetchPricingPlans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('pricing_plans')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPricingPlans(data || []);
+    } catch (error) {
+      console.error('Error fetching pricing plans:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch pricing plans."
+      });
+    }
+  };
+
+  const handleCreatePlan = () => {
+    setPlanFormData({
+      name: '',
+      price: '',
+      billing_cycle: 'monthly',
+      max_number_of_product: 0,
+      transaction_fee: 0,
+      is_active: true,
+      can_see_sales_reports: false,
+      can_shopper_subscription: false,
+      can_accept_pre_order: false,
+      can_access_customer_contact_list: false,
+      can_create_branded_stall_page: false,
+      can_create_custom_coupon: false,
+      can_run_custom_promosion: false,
+      can_create_multiple_stand: false,
+      allowed_to_business_in_multiple_location: false,
+      can_access_to_advanced_analytics: false,
+      can_eligible_for_priority_map_placement: false,
+      can_sale_wholesale_and_bulk: false,
+      can_receive_loyalty_rewards: false,
+      allowed_to_get_marketing_campaign_credits: false,
+      allowed_to_run_event_management_and_ticketing: false,
+      access_to_bulk_promotional_tools: false,
+      allowed_to_customizable_loyalty_programs: false,
+      access_to_advanced_branding_options: false,
+      can_have_dedicated_account_manager: false,
+      access_to_white_label_option: false
+    });
+    setEditingPlan(null);
+    setPlanModalOpen(true);
+  };
+
+  const handleEditPlan = (plan: PricingPlan) => {
+    setPlanFormData(plan);
+    setEditingPlan(plan.id);
+    setPlanModalOpen(true);
+  };
+
+  const handleSavePlan = async () => {
+    try {
+      const planData = {
+        name: planFormData.name || '',
+        price: planFormData.price || '',
+        billing_cycle: planFormData.billing_cycle || 'monthly',
+        max_number_of_product: planFormData.max_number_of_product || 0,
+        transaction_fee: planFormData.transaction_fee || 0,
+        is_active: planFormData.is_active ?? true,
+        can_see_sales_reports: planFormData.can_see_sales_reports ?? false,
+        can_shopper_subscription: planFormData.can_shopper_subscription ?? false,
+        can_accept_pre_order: planFormData.can_accept_pre_order ?? false,
+        can_access_customer_contact_list: planFormData.can_access_customer_contact_list ?? false,
+        can_create_branded_stall_page: planFormData.can_create_branded_stall_page ?? false,
+        can_create_custom_coupon: planFormData.can_create_custom_coupon ?? false,
+        can_run_custom_promosion: planFormData.can_run_custom_promosion ?? false,
+        can_create_multiple_stand: planFormData.can_create_multiple_stand ?? false,
+        allowed_to_business_in_multiple_location: planFormData.allowed_to_business_in_multiple_location ?? false,
+        can_access_to_advanced_analytics: planFormData.can_access_to_advanced_analytics ?? false,
+        can_eligible_for_priority_map_placement: planFormData.can_eligible_for_priority_map_placement ?? false,
+        can_sale_wholesale_and_bulk: planFormData.can_sale_wholesale_and_bulk ?? false,
+        can_receive_loyalty_rewards: planFormData.can_receive_loyalty_rewards ?? false,
+        allowed_to_get_marketing_campaign_credits: planFormData.allowed_to_get_marketing_campaign_credits ?? false,
+        allowed_to_run_event_management_and_ticketing: planFormData.allowed_to_run_event_management_and_ticketing ?? false,
+        access_to_bulk_promotional_tools: planFormData.access_to_bulk_promotional_tools ?? false,
+        allowed_to_customizable_loyalty_programs: planFormData.allowed_to_customizable_loyalty_programs ?? false,
+        access_to_advanced_branding_options: planFormData.access_to_advanced_branding_options ?? false,
+        can_have_dedicated_account_manager: planFormData.can_have_dedicated_account_manager ?? false,
+        access_to_white_label_option: planFormData.access_to_white_label_option ?? false
+      };
+
+      if (editingPlan) {
+        // Update existing plan
+        const { error } = await supabase
+          .from('pricing_plans')
+          .update(planData)
+          .eq('id', editingPlan);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Pricing plan updated successfully."
+        });
+      } else {
+        // Create new plan
+        const { error } = await supabase
+          .from('pricing_plans')
+          .insert(planData);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Pricing plan created successfully."
+        });
+      }
+
+      setPlanModalOpen(false);
+      await fetchPricingPlans();
+    } catch (error) {
+      console.error('Error saving pricing plan:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save pricing plan."
+      });
+    }
+  };
+
+  const handleDeletePlan = async (planId: string) => {
+    try {
+      const { error } = await supabase
+        .from('pricing_plans')
+        .delete()
+        .eq('id', planId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Pricing plan deleted successfully."
+      });
+
+      await fetchPricingPlans();
+    } catch (error) {
+      console.error('Error deleting pricing plan:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete pricing plan."
       });
     }
   };
@@ -281,89 +479,173 @@ const AdminDashboard = () => {
           </Card>
         </div>
 
-        {/* Applications Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Farmer Applications</CardTitle>
-            <CardDescription>
-              Review and manage farmer registration applications
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Contact Person</TableHead>
-                  <TableHead>Farm Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date Applied</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {applications.map((application) => (
-                  <TableRow key={application.id}>
-                    <TableCell className="font-medium">
-                      {application.contact_person}
-                    </TableCell>
-                    <TableCell>{application.farm_name}</TableCell>
-                    <TableCell>{application.email}</TableCell>
-                    <TableCell>{getStatusBadge(application.approval_status)}</TableCell>
-                    <TableCell>
-                      {new Date(application.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedApplication(application);
-                            // You could implement a detailed view modal here
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {application.approval_status === 'pending' && (
-                          <>
+        {/* Main Content Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="applications">Farmer Applications</TabsTrigger>
+            <TabsTrigger value="pricing">Pricing Plans</TabsTrigger>
+          </TabsList>
+          
+          {/* Applications Tab */}
+          <TabsContent value="applications">
+            <Card>
+              <CardHeader>
+                <CardTitle>Farmer Applications</CardTitle>
+                <CardDescription>
+                  Review and manage farmer registration applications
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Contact Person</TableHead>
+                      <TableHead>Farm Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Date Applied</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {applications.map((application) => (
+                      <TableRow key={application.id}>
+                        <TableCell className="font-medium">
+                          {application.contact_person}
+                        </TableCell>
+                        <TableCell>{application.farm_name}</TableCell>
+                        <TableCell>{application.email}</TableCell>
+                        <TableCell>{getStatusBadge(application.approval_status)}</TableCell>
+                        <TableCell>
+                          {new Date(application.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
                             <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => {
                                 setSelectedApplication(application);
-                                setActionType('approve');
+                                // You could implement a detailed view modal here
                               }}
-                              className="bg-green-600 hover:bg-green-700"
                             >
-                              <CheckCircle className="h-4 w-4" />
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            {application.approval_status === 'pending' && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedApplication(application);
+                                    setActionType('approve');
+                                  }}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedApplication(application);
+                                    setActionType('reject');
+                                  }}
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {applications.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No farmer applications found.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Pricing Plans Tab */}
+          <TabsContent value="pricing">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Pricing Plans</CardTitle>
+                  <CardDescription>
+                    Manage subscription plans for farmers
+                  </CardDescription>
+                </div>
+                <Button onClick={handleCreatePlan}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Plan
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Billing Cycle</TableHead>
+                      <TableHead>Max Products</TableHead>
+                      <TableHead>Transaction Fee</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pricingPlans.map((plan) => (
+                      <TableRow key={plan.id}>
+                        <TableCell className="font-medium">{plan.name}</TableCell>
+                        <TableCell>{plan.price}</TableCell>
+                        <TableCell className="capitalize">{plan.billing_cycle}</TableCell>
+                        <TableCell>{plan.max_number_of_product}</TableCell>
+                        <TableCell>{plan.transaction_fee}%</TableCell>
+                        <TableCell>
+                          <Badge variant={plan.is_active ? "default" : "secondary"}>
+                            {plan.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditPlan(plan)}
+                            >
+                              <Edit className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
                               onClick={() => {
-                                setSelectedApplication(application);
-                                setActionType('reject');
+                                setSelectedPlan(plan);
                               }}
                             >
-                              <XCircle className="h-4 w-4" />
+                              <Trash className="h-4 w-4" />
                             </Button>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {applications.length === 0 && (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No farmer applications found.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {pricingPlans.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No pricing plans found.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
-        {/* Confirmation Dialog */}
+        {/* Application Action Confirmation Dialog */}
         <AlertDialog open={!!actionType} onOpenChange={() => {
           setActionType(null);
           setSelectedApplication(null);
@@ -399,6 +681,169 @@ const AdminDashboard = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Delete Plan Confirmation Dialog */}
+        <AlertDialog open={!!selectedPlan} onOpenChange={() => setSelectedPlan(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Pricing Plan</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete the pricing plan "{selectedPlan?.name}"?
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (selectedPlan) {
+                    handleDeletePlan(selectedPlan.id);
+                    setSelectedPlan(null);
+                  }
+                }}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Pricing Plan Form Modal */}
+        <Dialog open={planModalOpen} onOpenChange={setPlanModalOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editingPlan ? 'Edit Pricing Plan' : 'Create New Pricing Plan'}
+              </DialogTitle>
+              <DialogDescription>
+                Configure the features and pricing for this plan.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Basic Information</h3>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="name">Plan Name</Label>
+                  <Input
+                    id="name"
+                    value={planFormData.name || ''}
+                    onChange={(e) => setPlanFormData({...planFormData, name: e.target.value})}
+                    placeholder="e.g., Basic, Premium, Enterprise"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price</Label>
+                  <Input
+                    id="price"
+                    value={planFormData.price || ''}
+                    onChange={(e) => setPlanFormData({...planFormData, price: e.target.value})}
+                    placeholder="e.g., $9.99, Free"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="billing_cycle">Billing Cycle</Label>
+                  <Select
+                    value={planFormData.billing_cycle || 'monthly'}
+                    onValueChange={(value) => setPlanFormData({...planFormData, billing_cycle: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                      <SelectItem value="one-time">One-time</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="max_products">Max Number of Products</Label>
+                  <Input
+                    id="max_products"
+                    type="number"
+                    value={planFormData.max_number_of_product || 0}
+                    onChange={(e) => setPlanFormData({...planFormData, max_number_of_product: parseInt(e.target.value) || 0})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="transaction_fee">Transaction Fee (%)</Label>
+                  <Input
+                    id="transaction_fee"
+                    type="number"
+                    step="0.01"
+                    value={planFormData.transaction_fee || 0}
+                    onChange={(e) => setPlanFormData({...planFormData, transaction_fee: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="is_active"
+                    checked={planFormData.is_active ?? true}
+                    onCheckedChange={(checked) => setPlanFormData({...planFormData, is_active: checked})}
+                  />
+                  <Label htmlFor="is_active">Active Plan</Label>
+                </div>
+              </div>
+              
+              {/* Features */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Features</h3>
+                
+                <div className="space-y-3">
+                  {[
+                    { key: 'can_see_sales_reports', label: 'View Sales Reports' },
+                    { key: 'can_shopper_subscription', label: 'Shopper Subscriptions' },
+                    { key: 'can_accept_pre_order', label: 'Accept Pre-orders' },
+                    { key: 'can_access_customer_contact_list', label: 'Customer Contact List' },
+                    { key: 'can_create_branded_stall_page', label: 'Branded Stall Page' },
+                    { key: 'can_create_custom_coupon', label: 'Custom Coupons' },
+                    { key: 'can_run_custom_promosion', label: 'Custom Promotions' },
+                    { key: 'can_create_multiple_stand', label: 'Multiple Stands' },
+                    { key: 'allowed_to_business_in_multiple_location', label: 'Multiple Locations' },
+                    { key: 'can_access_to_advanced_analytics', label: 'Advanced Analytics' },
+                    { key: 'can_eligible_for_priority_map_placement', label: 'Priority Map Placement' },
+                    { key: 'can_sale_wholesale_and_bulk', label: 'Wholesale & Bulk Sales' },
+                    { key: 'can_receive_loyalty_rewards', label: 'Loyalty Rewards' },
+                    { key: 'allowed_to_get_marketing_campaign_credits', label: 'Marketing Campaign Credits' },
+                    { key: 'allowed_to_run_event_management_and_ticketing', label: 'Event Management' },
+                    { key: 'access_to_bulk_promotional_tools', label: 'Bulk Promotional Tools' },
+                    { key: 'allowed_to_customizable_loyalty_programs', label: 'Customizable Loyalty Programs' },
+                    { key: 'access_to_advanced_branding_options', label: 'Advanced Branding Options' },
+                    { key: 'can_have_dedicated_account_manager', label: 'Dedicated Account Manager' },
+                    { key: 'access_to_white_label_option', label: 'White Label Option' }
+                  ].map((feature) => (
+                    <div key={feature.key} className="flex items-center space-x-2">
+                      <Switch
+                        id={feature.key}
+                        checked={planFormData[feature.key as keyof PricingPlan] as boolean ?? false}
+                        onCheckedChange={(checked) => setPlanFormData({...planFormData, [feature.key]: checked})}
+                      />
+                      <Label htmlFor={feature.key} className="text-sm">{feature.label}</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPlanModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSavePlan}>
+                {editingPlan ? 'Update Plan' : 'Create Plan'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
