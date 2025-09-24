@@ -15,13 +15,13 @@ export const Hero = () => {
       
       <div className="relative z-10 container mx-auto px-4 text-center">
         <h1 className="text-5xl md:text-6xl font-bold mb-6 text-foreground">
-          From Local farms to
-          <span className="block text-farm-green">Local Tables</span>
+          Connect with
+          <span className="block text-farm-green">Local Family Farms</span>
         </h1>
         
         <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-          Easy access to the freshest produce, seasonal fruits, farm-fresh vegetables, 
-          and quality products straight from local family farms to your table.
+          Your digital marketplace connecting farm families with customers who love fresh, 
+          local produce. Support family farms and discover farm events in your community.
         </p>
         
         <div className="max-w-2xl mx-auto bg-card/90 backdrop-blur-sm rounded-xl p-6 shadow-farm border border-border/20">
