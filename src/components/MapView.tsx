@@ -29,6 +29,15 @@ export const MapView = () => {
   const [mapError, setMapError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(false);
 
+  // Load token from localStorage on component mount
+  useEffect(() => {
+    const savedToken = localStorage.getItem('mapboxToken');
+    if (savedToken) {
+      setMapboxToken(savedToken);
+      setShowTokenInput(false);
+    }
+  }, []);
+
   // Fetch farms from Supabase
   const { data: farms = [], isLoading } = useQuery({
     queryKey: ['farms'],
@@ -179,6 +188,8 @@ export const MapView = () => {
   const handleTokenSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (mapboxToken.trim()) {
+      // Save token to localStorage
+      localStorage.setItem('mapboxToken', mapboxToken);
       setShowTokenInput(false);
       setMapError('');
       initializeMap(mapboxToken);
