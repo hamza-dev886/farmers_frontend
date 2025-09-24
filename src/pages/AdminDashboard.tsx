@@ -65,6 +65,16 @@ interface PricingPlan {
   updated_at: string;
 }
 
+interface FarmerPlanAssignment {
+  user_id: string;
+  user_email: string;
+  user_full_name: string;
+  current_plan_id: string;
+  current_plan_name: string;
+  assigned_at: string;
+  is_active: boolean;
+}
+
 interface DashboardStats {
   totalApplications: number;
   pendingApplications: number;
@@ -77,6 +87,7 @@ const AdminDashboard = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [applications, setApplications] = useState<FarmerApplication[]>([]);
   const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([]);
+  const [farmerPlans, setFarmerPlans] = useState<FarmerPlanAssignment[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     totalApplications: 0,
     pendingApplications: 0,
@@ -86,9 +97,12 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [selectedApplication, setSelectedApplication] = useState<FarmerApplication | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
+  const [selectedFarmer, setSelectedFarmer] = useState<FarmerPlanAssignment | null>(null);
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
   const [planModalOpen, setPlanModalOpen] = useState(false);
+  const [planChangeModalOpen, setPlanChangeModalOpen] = useState(false);
   const [planFormData, setPlanFormData] = useState<Partial<PricingPlan>>({});
+  const [newPlanId, setNewPlanId] = useState<string>('');
   const [editingPlan, setEditingPlan] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("applications");
   const { toast } = useToast();
@@ -129,11 +143,66 @@ const AdminDashboard = () => {
       setIsAdmin(true);
       await fetchApplications();
       await fetchPricingPlans();
+      await fetchFarmerPlans();
     } catch (error) {
       console.error('Error checking auth:', error);
       navigate('/');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFarmerPlans = async () => {
+    try {
+      // First get all farm pricing plans
+      const { data: planData, error: planError } = await supabase
+        .from('farm_pricing_plans')
+        .select(`
+          user_id,
+          pricing_plan_id,
+          assigned_at,
+          is_active,
+          pricing_plans (
+            id,
+            name
+          )
+        `)
+        .eq('is_active', true)
+        .order('assigned_at', { ascending: false });
+
+      if (planError) throw planError;
+
+      // Then get user profiles for those users
+      const userIds = planData?.map(item => item.user_id) || [];
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Combine the data
+      const formattedData: FarmerPlanAssignment[] = (planData || []).map(item => {
+        const profile = profilesData?.find(p => p.id === item.user_id);
+        return {
+          user_id: item.user_id,
+          user_email: profile?.email || 'N/A',
+          user_full_name: profile?.full_name || 'N/A',
+          current_plan_id: item.pricing_plan_id,
+          current_plan_name: item.pricing_plans?.name || 'Unknown',
+          assigned_at: item.assigned_at,
+          is_active: item.is_active
+        };
+      });
+
+      setFarmerPlans(formattedData);
+    } catch (error) {
+      console.error('Error fetching farmer plans:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch farmer plan assignments."
+      });
     }
   };
 
@@ -323,6 +392,65 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleChangeFarmerPlan = (farmer: FarmerPlanAssignment) => {
+    setSelectedFarmer(farmer);
+    setNewPlanId(farmer.current_plan_id);
+    setPlanChangeModalOpen(true);
+  };
+
+  const handleSaveFarmerPlanChange = async () => {
+    if (!selectedFarmer || !newPlanId) return;
+
+    try {
+      // Deactivate current plan assignment
+      const { error: deactivateError } = await supabase
+        .from('farm_pricing_plans')
+        .update({ is_active: false })
+        .eq('user_id', selectedFarmer.user_id)
+        .eq('is_active', true);
+
+      if (deactivateError) throw deactivateError;
+
+      // Create new plan assignment
+      const { error: createError } = await supabase
+        .from('farm_pricing_plans')
+        .insert({
+          user_id: selectedFarmer.user_id,
+          pricing_plan_id: newPlanId,
+          assigned_by: user?.id,
+          is_active: true
+        });
+
+      if (createError) throw createError;
+
+      // Log admin action
+      await supabase.rpc('log_admin_action', {
+        action_type: 'farmer_plan_change',
+        target_user_id: selectedFarmer.user_id,
+        action_details: {
+          old_plan_id: selectedFarmer.current_plan_id,
+          new_plan_id: newPlanId
+        }
+      });
+
+      toast({
+        title: "Success",
+        description: "Farmer plan updated successfully."
+      });
+
+      setPlanChangeModalOpen(false);
+      setSelectedFarmer(null);
+      await fetchFarmerPlans();
+    } catch (error) {
+      console.error('Error updating farmer plan:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update farmer plan."
+      });
+    }
+  };
+
   const handleApplicationAction = async (applicationId: string, action: 'approve' | 'reject') => {
     if (!user) return;
 
@@ -481,9 +609,10 @@ const AdminDashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="applications">Farmer Applications</TabsTrigger>
             <TabsTrigger value="pricing">Pricing Plans</TabsTrigger>
+            <TabsTrigger value="farmer-plans">Farmer Plan Management</TabsTrigger>
           </TabsList>
           
           {/* Applications Tab */}
@@ -638,6 +767,68 @@ const AdminDashboard = () => {
                 {pricingPlans.length === 0 && (
                   <div className="text-center py-8">
                     <p className="text-muted-foreground">No pricing plans found.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Farmer Plan Management Tab */}
+          <TabsContent value="farmer-plans">
+            <Card>
+              <CardHeader>
+                <CardTitle>Farmer Plan Management</CardTitle>
+                <CardDescription>
+                  View and manage pricing plan assignments for farmers
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Farmer Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Current Plan</TableHead>
+                      <TableHead>Assigned Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {farmerPlans.map((farmer) => (
+                      <TableRow key={farmer.user_id}>
+                        <TableCell className="font-medium">
+                          {farmer.user_full_name}
+                        </TableCell>
+                        <TableCell>{farmer.user_email}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{farmer.current_plan_name}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(farmer.assigned_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={farmer.is_active ? "default" : "secondary"}>
+                            {farmer.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleChangeFarmerPlan(farmer)}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Change Plan
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {farmerPlans.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No farmers with plan assignments found.</p>
                   </div>
                 )}
               </CardContent>
@@ -840,6 +1031,58 @@ const AdminDashboard = () => {
               </Button>
               <Button onClick={handleSavePlan}>
                 {editingPlan ? 'Update Plan' : 'Create Plan'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Farmer Plan Change Modal */}
+        <Dialog open={planChangeModalOpen} onOpenChange={setPlanChangeModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Change Farmer Plan</DialogTitle>
+              <DialogDescription>
+                Update the pricing plan for {selectedFarmer?.user_full_name}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Current Plan</Label>
+                <div className="p-2 bg-muted rounded-md">
+                  {selectedFarmer?.current_plan_name}
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="new-plan">New Plan</Label>
+                <Select value={newPlanId} onValueChange={setNewPlanId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a new plan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pricingPlans
+                      .filter(plan => plan.is_active)
+                      .map((plan) => (
+                        <SelectItem key={plan.id} value={plan.id}>
+                          {plan.name} - {plan.price}
+                        </SelectItem>
+                      ))
+                    }
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPlanChangeModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveFarmerPlanChange}
+                disabled={newPlanId === selectedFarmer?.current_plan_id}
+              >
+                Update Plan
               </Button>
             </DialogFooter>
           </DialogContent>
