@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { MapboxAutocomplete } from "@/components/ui/mapbox-autocomplete";
+import { MapboxMapPreview } from "@/components/ui/mapbox-map-preview";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -215,15 +216,18 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                         <FormItem>
                           <FormLabel>Farm Address *</FormLabel>
                           <FormControl>
-                            <MapboxAutocomplete
-                              value={field.value}
-                              onChange={(address, coordinates) => {
-                                field.onChange(address);
-                                setFarmCoordinates(coordinates || null);
-                              }}
-                              placeholder="Search for your farm address..."
-                              className="min-h-[40px]"
-                            />
+                            <div className="space-y-3">
+                              <MapboxAutocomplete
+                                value={field.value}
+                                onChange={(address, coordinates) => {
+                                  field.onChange(address);
+                                  setFarmCoordinates(coordinates || null);
+                                }}
+                                placeholder="Search for your farm address..."
+                                className="min-h-[40px]"
+                              />
+                              <MapboxMapPreview coordinates={farmCoordinates} />
+                            </div>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
