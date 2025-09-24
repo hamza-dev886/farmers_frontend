@@ -154,10 +154,21 @@ export const MapView = () => {
   };
 
   useEffect(() => {
-    if (mapboxToken && !map.current) {
+    if (mapboxToken && !map.current && mapContainer.current) {
+      console.log('Initializing map with token:', mapboxToken.substring(0, 10) + '...');
       initializeMap(mapboxToken);
     }
   }, [mapboxToken]);
+
+  // Ensure cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (map.current && farms.length > 0) {
@@ -187,6 +198,13 @@ export const MapView = () => {
 
   return (
     <div className="relative w-full h-[600px] bg-gradient-subtle rounded-lg border border-border overflow-hidden">
+      {/* Debug info */}
+      <div className="absolute top-2 right-2 z-50 bg-background/90 p-2 rounded text-xs">
+        Token: {mapboxToken ? 'Set' : 'Not set'} | 
+        Show Input: {showTokenInput.toString()} | 
+        Error: {mapError ? 'Yes' : 'No'} | 
+        Initializing: {isInitializing.toString()}
+      </div>
       {mapError && (
         <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
