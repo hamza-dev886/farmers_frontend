@@ -142,7 +142,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                       name="contactPerson"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Contact Person *</FormLabel>
+                          <FormLabel>Contact Person <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <Input placeholder="Full name of primary contact" {...field} />
                           </FormControl>
@@ -156,7 +156,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                       name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Email Address *</FormLabel>
+                          <FormLabel>Email Address <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <Input 
                               type="email" 
@@ -174,7 +174,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                       name="phone"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Phone Number *</FormLabel>
+                          <FormLabel>Phone Number <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <Input 
                               type="tel" 
@@ -200,7 +200,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                       name="farmName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Farm Name *</FormLabel>
+                          <FormLabel>Farm Name <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <Input placeholder="e.g., Green Valley Farm" {...field} />
                           </FormControl>
@@ -214,7 +214,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                       name="farmAddress"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Farm Address *</FormLabel>
+                          <FormLabel>Farm Address <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <div className="space-y-3">
                               <MapboxAutocomplete
@@ -248,7 +248,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                     name="farmBio"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Farm Description *</FormLabel>
+                        <FormLabel>Farm Description <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
                           <Textarea 
                             placeholder="Tell us about your farm, farming practices, history, sustainability efforts, and what makes your products special..."
@@ -264,7 +264,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
 
                 {/* Products Section */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-farm-green">Products You Offer *</h3>
+                  <h3 className="text-lg font-semibold text-farm-green">Products You Offer <span className="text-destructive">*</span></h3>
                   <p className="text-sm text-muted-foreground">Select all product types that apply to your farm:</p>
                   
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -309,7 +309,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                         </FormControl>
                         <div className="space-y-1 leading-none">
                           <FormLabel className="cursor-pointer">
-                            I agree to the terms and conditions *
+                            I agree to the terms and conditions <span className="text-destructive">*</span>
                           </FormLabel>
                           <p className="text-sm text-muted-foreground">
                             By checking this box, you agree to our platform guidelines, 

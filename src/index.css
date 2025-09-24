@@ -133,4 +133,18 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Make asterisks in form labels red */
+  label:has-text('*')::after,
+  .form-label-asterisk {
+    color: hsl(var(--destructive));
+  }
+}
+
+@layer components {
+  /* Target asterisks in form labels */
+  label[data-required="true"]::after {
+    content: " *";
+    color: hsl(var(--destructive));
+  }
 }
