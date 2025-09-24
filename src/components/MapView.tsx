@@ -29,14 +29,28 @@ export const MapView = () => {
   const [mapError, setMapError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(false);
 
-  // Load token from localStorage on component mount
+  // Fetch Mapbox token from config table
+  const { data: configData } = useQuery({
+    queryKey: ['config', 'mapbox_token'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('config')
+        .select('value')
+        .eq('key', 'mapbox_token')
+        .single();
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Update token when config data loads
   useEffect(() => {
-    const savedToken = localStorage.getItem('mapboxToken');
-    if (savedToken) {
-      setMapboxToken(savedToken);
+    if (configData?.value) {
+      setMapboxToken(configData.value);
       setShowTokenInput(false);
     }
-  }, []);
+  }, [configData]);
 
   // Fetch farms from Supabase
   const { data: farms = [], isLoading } = useQuery({
@@ -188,8 +202,6 @@ export const MapView = () => {
   const handleTokenSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (mapboxToken.trim()) {
-      // Save token to localStorage
-      localStorage.setItem('mapboxToken', mapboxToken);
       setShowTokenInput(false);
       setMapError('');
       initializeMap(mapboxToken);
@@ -248,35 +260,19 @@ export const MapView = () => {
         </div>
       )}
 
-      {showTokenInput && (
+      {showTokenInput && !configData?.value && (
         <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <CardHeader>
-              <CardTitle className="text-center">Setup Mapbox</CardTitle>
+              <CardTitle className="text-center">Mapbox Configuration</CardTitle>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleTokenSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="mapbox-token">Mapbox Public Token</Label>
-                  <Input
-                    id="mapbox-token"
-                    type="text"
-                    value={mapboxToken}
-                    onChange={(e) => setMapboxToken(e.target.value)}
-                    placeholder="pk.eyJ1IjoieW91cnVzZXJuYW1lIi..."
-                    className="mt-1"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Get your free token at{' '}
-                    <a href="https://mapbox.com/" target="_blank" rel="noopener noreferrer" className="text-farm-green hover:underline">
-                      mapbox.com
-                    </a>
-                  </p>
-                </div>
-                <Button type="submit" className="w-full" disabled={!mapboxToken.trim()}>
-                  Load Map
-                </Button>
-              </form>
+            <CardContent className="text-center space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Mapbox token is configured in the system configuration.
+              </p>
+              <Button onClick={() => setShowTokenInput(false)}>
+                Close
+              </Button>
             </CardContent>
           </Card>
         </div>
