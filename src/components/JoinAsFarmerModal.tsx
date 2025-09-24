@@ -45,6 +45,17 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
   const [farmCoordinates, setFarmCoordinates] = useState<[number, number] | null>(null);
   const { toast } = useToast();
 
+  // Generate a random password
+  const generatePassword = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    // Ensure it meets requirements
+    return 'Farmer' + password + '123';
+  };
+
   const form = useForm<FarmerApplicationForm>({
     resolver: zodResolver(farmerApplicationSchema),
     defaultValues: {
@@ -64,7 +75,31 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
     setIsSubmitting(true);
     
     try {
-      const { error } = await supabase
+      // Generate temporary password
+      const tempPassword = generatePassword();
+
+      // Create user account with temporary password
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: data.email,
+        password: tempPassword,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            full_name: data.contactPerson,
+            role: 'farmer',
+            password_expired: true
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      if (!authData.user) {
+        throw new Error("User creation failed");
+      }
+
+      // Submit farmer application with the new user's ID
+      const { error: applicationError } = await supabase
         .from('farmer_applications')
         .insert({
           contact_person: data.contactPerson,
@@ -76,23 +111,30 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
           farm_bio: data.farmBio,
           products: data.products,
           approval_status: 'pending',
-          user_id: null, // Will be populated when user creates account
+          user_id: authData.user.id
         });
 
-      if (error) throw error;
+      if (applicationError) throw applicationError;
+
+      // Store temporary password in profiles table for reference
+      await supabase
+        .from('profiles')
+        .update({ temp_password: tempPassword })
+        .eq('id', authData.user.id);
 
       toast({
-        title: "Application Submitted!",
-        description: "Thank you for your interest. We'll review your application and get back to you within 1-3 business days.",
+        title: "Account created successfully!",
+        description: `Your farmer account has been created. Your temporary password is: ${tempPassword}. Please save this and change it on first login.`,
+        duration: 10000,
       });
 
       form.reset();
       onOpenChange(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting application:', error);
       toast({
         title: "Submission Error",
-        description: "There was an issue submitting your application. Please try again.",
+        description: error.message || "There was an issue submitting your application. Please try again.",
         variant: "destructive",
       });
     } finally {

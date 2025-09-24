@@ -20,6 +20,7 @@ import {
 import { useViewMode } from "@/hooks/useViewMode";
 import { JoinAsFarmerModal } from "@/components/JoinAsFarmerModal";
 import { AuthModal } from "@/components/AuthModal";
+import { PasswordChangeModal } from "@/components/PasswordChangeModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -29,6 +30,7 @@ export const Header = () => {
   const { setViewMode } = useViewMode();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isPasswordChangeModalOpen, setIsPasswordChangeModalOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -53,6 +55,11 @@ export const Header = () => {
                 .eq('id', session.user.id)
                 .single();
               setUserProfile(profile);
+              
+              // Check if password is expired and show password change modal
+              if (profile?.password_expired && !isPasswordChangeModalOpen) {
+                setIsPasswordChangeModalOpen(true);
+              }
             } catch (error) {
               console.error('Error fetching user profile:', error);
             }
@@ -203,6 +210,29 @@ export const Header = () => {
         open={isAuthModalOpen}
         onOpenChange={setIsAuthModalOpen}
         onOpenFarmerModal={() => setIsModalOpen(true)}
+      />
+      
+      <PasswordChangeModal
+        open={isPasswordChangeModalOpen}
+        onOpenChange={setIsPasswordChangeModalOpen}
+        onPasswordChanged={() => {
+          setIsPasswordChangeModalOpen(false);
+          if (user) {
+            // Refresh user profile
+            setTimeout(async () => {
+              try {
+                const { data: profile } = await supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', user.id)
+                  .single();
+                setUserProfile(profile);
+              } catch (error) {
+                console.error('Error fetching user profile:', error);
+              }
+            }, 0);
+          }
+        }}
       />
     </header>
   );

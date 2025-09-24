@@ -4709,8 +4709,10 @@ export type Database = {
           email: string
           full_name: string | null
           id: string
+          password_expired: boolean | null
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
+          temp_password: string | null
           updated_at: string
         }
         Insert: {
@@ -4718,8 +4720,10 @@ export type Database = {
           email: string
           full_name?: string | null
           id?: string
+          password_expired?: boolean | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          temp_password?: string | null
           updated_at?: string
         }
         Update: {
@@ -4727,8 +4731,10 @@ export type Database = {
           email?: string
           full_name?: string | null
           id?: string
+          password_expired?: boolean | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          temp_password?: string | null
           updated_at?: string
         }
         Relationships: []
