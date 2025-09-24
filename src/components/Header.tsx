@@ -202,6 +202,7 @@ export const Header = () => {
       <AuthModal 
         open={isAuthModalOpen}
         onOpenChange={setIsAuthModalOpen}
+        onOpenFarmerModal={() => setIsModalOpen(true)}
       />
     </header>
   );
