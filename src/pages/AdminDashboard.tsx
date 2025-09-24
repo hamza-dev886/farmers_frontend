@@ -98,7 +98,7 @@ const AdminDashboard = () => {
   const [selectedApplication, setSelectedApplication] = useState<FarmerApplication | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
   const [selectedFarmer, setSelectedFarmer] = useState<FarmerPlanAssignment | null>(null);
-  const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
+  const [actionType, setActionType] = useState<'approve' | 'reject' | 'delete' | null>(null);
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [planChangeModalOpen, setPlanChangeModalOpen] = useState(false);
   const [planFormData, setPlanFormData] = useState<Partial<PricingPlan>>({});
@@ -451,10 +451,38 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleApplicationAction = async (applicationId: string, action: 'approve' | 'reject') => {
+  const handleApplicationAction = async (applicationId: string, action: 'approve' | 'reject' | 'delete') => {
     if (!user) return;
 
     try {
+      if (action === 'delete') {
+        // Delete the application
+        const { error } = await supabase
+          .from('farmer_applications')
+          .delete()
+          .eq('id', applicationId);
+
+        if (error) throw error;
+
+        // Log admin action
+        await supabase.rpc('log_admin_action', {
+          action_type: 'farmer_application_delete',
+          target_user_id: applications.find(app => app.id === applicationId)?.user_id,
+          action_details: { application_id: applicationId }
+        });
+
+        toast({
+          title: "Success",
+          description: "Application deleted successfully."
+        });
+
+        await fetchApplications();
+        setSelectedApplication(null);
+        setActionType(null);
+        return;
+      }
+
+      // Handle approve/reject actions
       const updateData = {
         approval_status: action === 'approve' ? 'approved' : 'rejected',
         approved_at: new Date().toISOString(),
@@ -684,6 +712,17 @@ const AdminDashboard = () => {
                                 </Button>
                               </>
                             )}
+                            {/* Delete button for all applications */}
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedApplication(application);
+                                setActionType('delete');
+                              }}
+                            >
+                              <Trash className="h-4 w-4" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -844,7 +883,7 @@ const AdminDashboard = () => {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>
-                {actionType === 'approve' ? 'Approve' : 'Reject'} Application
+                {actionType === 'approve' ? 'Approve' : actionType === 'reject' ? 'Reject' : 'Delete'} Application
               </AlertDialogTitle>
               <AlertDialogDescription>
                 Are you sure you want to {actionType} the application from{' '}
@@ -853,6 +892,11 @@ const AdminDashboard = () => {
                 {actionType === 'approve' && (
                   <span className="block mt-2 text-sm">
                     This will create a farm entry and grant farmer permissions to the user.
+                  </span>
+                )}
+                {actionType === 'delete' && (
+                  <span className="block mt-2 text-sm text-red-600">
+                    This action cannot be undone. The application will be permanently deleted.
                   </span>
                 )}
               </AlertDialogDescription>
@@ -865,9 +909,9 @@ const AdminDashboard = () => {
                     handleApplicationAction(selectedApplication.id, actionType);
                   }
                 }}
-                className={actionType === 'approve' ? 'bg-green-600 hover:bg-green-700' : ''}
+                className={actionType === 'approve' ? 'bg-green-600 hover:bg-green-700' : actionType === 'delete' ? 'bg-red-600 hover:bg-red-700' : ''}
               >
-                {actionType === 'approve' ? 'Approve' : 'Reject'}
+                {actionType === 'approve' ? 'Approve' : actionType === 'reject' ? 'Reject' : 'Delete'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
