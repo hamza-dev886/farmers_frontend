@@ -2,16 +2,16 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ChevronLeft, Wheat, MapPin, Phone, Mail, User, Building, Leaf } from "lucide-react";
+import { Wheat, User, Building, Leaf, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Link } from "react-router-dom";
 
 const farmerApplicationSchema = z.object({
   contactPerson: z.string().min(2, "Contact person name must be at least 2 characters"),
@@ -32,7 +32,12 @@ const productOptions = [
   "Flowers & Plants", "Preserved Foods", "Organic Products"
 ];
 
-export default function JoinAsFarmer() {
+interface JoinAsFarmerModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
@@ -76,6 +81,7 @@ export default function JoinAsFarmer() {
       });
 
       form.reset();
+      onOpenChange(false);
     } catch (error) {
       console.error('Error submitting application:', error);
       toast({
@@ -98,47 +104,25 @@ export default function JoinAsFarmer() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-farm-cream to-background">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Link to="/">
-            <Button variant="ghost" size="sm">
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Back to Home
-            </Button>
-          </Link>
-          <div className="flex items-center gap-2">
-            <Wheat className="h-8 w-8 text-farm-green" />
-            <h1 className="text-3xl font-bold text-foreground">Join Our Farming Community</h1>
-          </div>
-        </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+        <ScrollArea className="max-h-[90vh]">
+          <div className="p-6">
+            {/* Header */}
+            <DialogHeader className="text-center mb-6">
+              <DialogTitle className="text-2xl text-farm-green flex items-center justify-center gap-2">
+                <Leaf className="h-6 w-6" />
+                Join Our Farming Community
+              </DialogTitle>
+              <DialogDescription className="text-lg max-w-2xl mx-auto">
+                Join our platform to connect directly with local customers, showcase your fresh produce, 
+                and grow your farming business. We support sustainable agriculture and fair trade practices.
+              </DialogDescription>
+            </DialogHeader>
 
-        {/* Hero Section */}
-        <Card className="mb-8 border-farm-green/20 shadow-farm">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl text-farm-green flex items-center justify-center gap-2">
-              <Leaf className="h-6 w-6" />
-              Become a Partner Farmer
-            </CardTitle>
-            <CardDescription className="text-lg max-w-2xl mx-auto">
-              Join our platform to connect directly with local customers, showcase your fresh produce, 
-              and grow your farming business. We support sustainable agriculture and fair trade practices.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-
-        {/* Application Form */}
-        <Card className="max-w-4xl mx-auto shadow-card">
-          <CardHeader>
-            <CardTitle>Farmer Application Form</CardTitle>
-            <CardDescription>
-              Please fill out all required information. Our team will review your application within 2-3 business days.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            {/* Application Form */}
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 {/* Contact Information */}
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-4">
@@ -255,7 +239,7 @@ export default function JoinAsFarmer() {
                         <FormControl>
                           <Textarea 
                             placeholder="Tell us about your farm, farming practices, history, sustainability efforts, and what makes your products special..."
-                            className="min-h-[120px]"
+                            className="min-h-[100px]"
                             {...field} 
                           />
                         </FormControl>
@@ -270,7 +254,7 @@ export default function JoinAsFarmer() {
                   <h3 className="text-lg font-semibold text-farm-green">Products You Offer *</h3>
                   <p className="text-sm text-muted-foreground">Select all product types that apply to your farm:</p>
                   
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {productOptions.map((product) => (
                       <div key={product} className="flex items-center space-x-2">
                         <Checkbox
@@ -326,57 +310,62 @@ export default function JoinAsFarmer() {
                 </div>
 
                 {/* Submit Button */}
-                <div className="flex justify-end pt-6">
+                <div className="flex justify-end gap-3 pt-4 border-t">
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
                   <Button 
                     type="submit" 
-                    size="lg"
                     disabled={isSubmitting}
-                    className="min-w-[200px] bg-gradient-to-r from-farm-green to-farm-green-light hover:from-farm-green-light hover:to-farm-green transition-smooth"
+                    className="min-w-[150px] bg-gradient-to-r from-farm-green to-farm-green-light hover:from-farm-green-light hover:to-farm-green transition-smooth"
                   >
                     {isSubmitting ? "Submitting..." : "Submit Application"}
                   </Button>
                 </div>
               </form>
             </Form>
-          </CardContent>
-        </Card>
 
-        {/* Additional Information */}
-        <Card className="max-w-4xl mx-auto mt-8 bg-farm-cream/50">
-          <CardContent className="pt-6">
-            <h3 className="text-lg font-semibold mb-4 text-farm-green">What Happens Next?</h3>
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="text-center">
-                <div className="w-12 h-12 bg-farm-green text-white rounded-full flex items-center justify-center mx-auto mb-3 text-lg font-bold">
-                  1
+            {/* Additional Information */}
+            <div className="mt-6 p-4 bg-farm-cream/50 rounded-lg">
+              <h3 className="text-lg font-semibold mb-4 text-farm-green">What Happens Next?</h3>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div className="text-center">
+                  <div className="w-8 h-8 bg-farm-green text-white rounded-full flex items-center justify-center mx-auto mb-2 text-sm font-bold">
+                    1
+                  </div>
+                  <h4 className="font-semibold mb-1 text-sm">Application Review</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Our team reviews your application within 2-3 business days
+                  </p>
                 </div>
-                <h4 className="font-semibold mb-2">Application Review</h4>
-                <p className="text-sm text-muted-foreground">
-                  Our team reviews your application within 2-3 business days
-                </p>
-              </div>
-              <div className="text-center">
-                <div className="w-12 h-12 bg-farm-green text-white rounded-full flex items-center justify-center mx-auto mb-3 text-lg font-bold">
-                  2
+                <div className="text-center">
+                  <div className="w-8 h-8 bg-farm-green text-white rounded-full flex items-center justify-center mx-auto mb-2 text-sm font-bold">
+                    2
+                  </div>
+                  <h4 className="font-semibold mb-1 text-sm">Farm Visit</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Approved applicants receive a farm visit to verify information
+                  </p>
                 </div>
-                <h4 className="font-semibold mb-2">Farm Visit</h4>
-                <p className="text-sm text-muted-foreground">
-                  Approved applicants receive a farm visit to verify information
-                </p>
-              </div>
-              <div className="text-center">
-                <div className="w-12 h-12 bg-farm-green text-white rounded-full flex items-center justify-center mx-auto mb-3 text-lg font-bold">
-                  3
+                <div className="text-center">
+                  <div className="w-8 h-8 bg-farm-green text-white rounded-full flex items-center justify-center mx-auto mb-2 text-sm font-bold">
+                    3
+                  </div>
+                  <h4 className="font-semibold mb-1 text-sm">Get Started</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Set up your farm profile and start connecting with customers
+                  </p>
                 </div>
-                <h4 className="font-semibold mb-2">Get Started</h4>
-                <p className="text-sm text-muted-foreground">
-                  Set up your farm profile and start connecting with customers
-                </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   );
 }

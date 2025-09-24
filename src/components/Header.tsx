@@ -1,6 +1,6 @@
+import { useState } from "react";
 import { Wheat, Menu, Heart, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
 import { 
   NavigationMenu, 
   NavigationMenuContent, 
@@ -10,9 +10,11 @@ import {
   NavigationMenuTrigger 
 } from "@/components/ui/navigation-menu";
 import { useViewMode } from "@/hooks/useViewMode";
+import { JoinAsFarmerModal } from "@/components/JoinAsFarmerModal";
 
 export const Header = () => {
   const { setViewMode } = useViewMode();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
     <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
@@ -77,16 +79,23 @@ export const Header = () => {
             <User className="h-4 w-4 mr-2" />
             Sign In
           </Button>
-          <Link to="/join-as-farmer">
-            <Button variant="farm" className="hidden sm:flex">
-              Join as Farmer
-            </Button>
-          </Link>
+          <Button 
+            variant="farm" 
+            className="hidden sm:flex"
+            onClick={() => setIsModalOpen(true)}
+          >
+            Join as Farmer
+          </Button>
           <Button variant="ghost" size="icon" className="md:hidden">
             <Menu className="h-5 w-5" />
           </Button>
         </div>
       </div>
+      
+      <JoinAsFarmerModal 
+        open={isModalOpen} 
+        onOpenChange={setIsModalOpen} 
+      />
     </header>
   );
 };
