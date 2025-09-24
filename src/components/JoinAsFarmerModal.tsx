@@ -77,7 +77,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
 
       toast({
         title: "Application Submitted!",
-        description: "Thank you for your interest. We'll review your application and get back to you within 2-3 business days.",
+        description: "Thank you for your interest. We'll review your application and get back to you within 1-3 business days.",
       });
 
       form.reset();
@@ -340,16 +340,16 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                   </div>
                   <h4 className="font-semibold mb-1 text-sm">Application Review</h4>
                   <p className="text-xs text-muted-foreground">
-                    Our team reviews your application within 2-3 business days
+                    Our team reviews your application within 1-3 business days
                   </p>
                 </div>
                 <div className="text-center">
                   <div className="w-8 h-8 bg-farm-green text-white rounded-full flex items-center justify-center mx-auto mb-2 text-sm font-bold">
                     2
                   </div>
-                  <h4 className="font-semibold mb-1 text-sm">Farm Visit</h4>
+                  <h4 className="font-semibold mb-1 text-sm">Farm Verification</h4>
                   <p className="text-xs text-muted-foreground">
-                    Approved applicants receive a farm visit to verify information
+                    Approved applicants undergo farm verification process
                   </p>
                 </div>
                 <div className="text-center">
