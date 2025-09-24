@@ -3,7 +3,6 @@ export interface Property {
   title: string;
   type: "farm" | "farmstall";
   location: string;
-  price: string;
   image: string;
   size: string;
   description: string;
@@ -17,7 +16,6 @@ export const mockProperties: Property[] = [
     title: "Sunny Valley Family Farm",
     type: "farm",
     location: "Sonoma County, CA",
-    price: "$475,000",
     image: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400&h=300&fit=crop",
     size: "25 acres",
     description: "Family-owned certified organic farm with three generations of farming expertise. We grow seasonal vegetables and offer farm tours.",
@@ -29,7 +27,6 @@ export const mockProperties: Property[] = [
     title: "Heritage Farm Market",
     type: "farmstall",
     location: "Lancaster County, PA",
-    price: "$185,000",
     image: "https://images.unsplash.com/photo-1441986380878-c4248f5b8b5b?w=400&h=300&fit=crop",
     size: "2 acres",
     description: "Family-run farm market serving the community for 20+ years. Fresh daily produce, homemade goods, and seasonal events.",
@@ -41,7 +38,6 @@ export const mockProperties: Property[] = [
     title: "Mountain View Dairy Farm",
     type: "farm",
     location: "Vermont",
-    price: "$750,000",
     image: "https://images.unsplash.com/photo-1516627145497-ae9cf05a1bec?w=400&h=300&fit=crop",
     size: "85 acres",
     description: "Third-generation family dairy farm with Jersey cows, artisanal cheese making, and weekend farm experiences.",
@@ -53,7 +49,6 @@ export const mockProperties: Property[] = [
     title: "Golden Gate Farmstand",
     type: "farmstall",
     location: "Marin County, CA",
-    price: "$220,000",
     image: "https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=400&h=300&fit=crop",
     size: "1.5 acres",
     description: "Family farm stand featuring organic produce, cut flowers, and seasonal specialties. Popular with locals and tourists.",
@@ -65,7 +60,6 @@ export const mockProperties: Property[] = [
     title: "Riverside Berry Farm",
     type: "farm",
     location: "Hood River, OR",
-    price: "$390,000",
     image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop",
     size: "15 acres",
     description: "Family berry farm in its fourth generation. Pick-your-own berries, farm events, and fresh berry products made on-site.",
@@ -77,7 +71,6 @@ export const mockProperties: Property[] = [
     title: "Country Fresh Market",
     type: "farmstall",
     location: "Loudoun County, VA",
-    price: "$165,000",
     image: "https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=400&h=300&fit=crop",
     size: "3 acres",
     description: "Multi-generational family market specializing in seasonal produce, farm-fresh eggs, and locally made artisanal products.",

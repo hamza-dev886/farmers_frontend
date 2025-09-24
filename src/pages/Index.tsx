@@ -79,7 +79,7 @@ const Index = () => {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                    <h2 className="text-2xl font-bold text-foreground">
-                     {isLoading ? 'Loading...' : `${farms.length + mockProperties.length} Listings`}
+                     {isLoading ? 'Loading...' : `${farms.length + mockProperties.length} Farm Listings`}
                    </h2>
                    <p className="text-muted-foreground">
                      {farms.length} Farms and {mockProperties.length} Farm stalls in your area

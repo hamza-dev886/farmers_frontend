@@ -9,7 +9,6 @@ interface PropertyCardProps {
   title: string;
   type: "farm" | "farmstall";
   location: string;
-  price: string;
   image: string;
   size: string;
   description: string;
@@ -22,7 +21,6 @@ export const PropertyCard = ({
   title, 
   type, 
   location, 
-  price, 
   image, 
   size, 
   description, 
@@ -72,11 +70,10 @@ export const PropertyCard = ({
       </div>
       
       <CardContent className="p-4">
-        <div className="flex justify-between items-start mb-2">
+        <div className="mb-2">
           <h3 className="font-semibold text-lg group-hover:text-farm-green transition-smooth">
             {title}
           </h3>
-          <span className="text-lg font-bold text-farm-green">{price}</span>
         </div>
         
         <div className="flex items-center text-muted-foreground mb-2">
