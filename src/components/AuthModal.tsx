@@ -23,7 +23,7 @@ const signupSchema = z.object({
   confirmPassword: z.string(),
   fullName: z.string().trim().min(1, { message: "Full name is required" }).max(100, { message: "Name must be less than 100 characters" }),
   phone: z.string().trim().optional(),
-  role: z.enum(['customer', 'farmer'], { message: "Please select a valid role" })
+  role: z.enum(['customer'], { message: "Please select a valid role" })
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -288,7 +288,7 @@ export const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
               <TabsContent value="signup">
                 <div className="space-y-4">
                   <CardDescription className="text-center">
-                    Create your account and join our farming community.
+                    Create your customer account to start shopping.
                   </CardDescription>
 
                   <form onSubmit={handleSignup} className="space-y-4">
@@ -296,7 +296,7 @@ export const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
                       <Label htmlFor="signup-role">Account Type</Label>
                       <Select
                         value={signupForm.role}
-                        onValueChange={(value: 'customer' | 'farmer') => 
+                        onValueChange={(value: 'customer') => 
                           setSignupForm({ ...signupForm, role: value })}
                         disabled={isLoading}
                       >
@@ -315,22 +315,17 @@ export const AuthModal = ({ open, onOpenChange }: AuthModalProps) => {
                               </div>
                             </div>
                           </SelectItem>
-                          <SelectItem value="farmer">
-                            <div className="flex items-center gap-2">
-                              {getRoleIcon('farmer')}
-                              <div>
-                                <div className="font-medium">🌾 Farmer</div>
-                                <div className="text-xs text-muted-foreground">
-                                  Sell your farm products directly to customers
-                                </div>
-                              </div>
-                            </div>
-                          </SelectItem>
                         </SelectContent>
                       </Select>
                       {signupErrors.role && (
                         <p className="text-sm text-destructive">{signupErrors.role}</p>
                       )}
+                      
+                      <div className="mt-3 p-3 bg-muted rounded-lg">
+                        <p className="text-sm text-muted-foreground">
+                          <strong>Want to sell your farm products?</strong> Use the "Join as Farmer" button in the header to apply as a farmer.
+                        </p>
+                      </div>
                     </div>
 
                     <div className="space-y-2">
