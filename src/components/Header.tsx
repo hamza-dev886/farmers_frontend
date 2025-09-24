@@ -1,5 +1,6 @@
 import { Wheat, Menu, Heart, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import { 
   NavigationMenu, 
   NavigationMenuContent, 
@@ -76,9 +77,11 @@ export const Header = () => {
             <User className="h-4 w-4 mr-2" />
             Sign In
           </Button>
-          <Button variant="farm" className="hidden sm:flex">
-            Join as Farmer
-          </Button>
+          <Link to="/join-as-farmer">
+            <Button variant="farm" className="hidden sm:flex">
+              Join as Farmer
+            </Button>
+          </Link>
           <Button variant="ghost" size="icon" className="md:hidden">
             <Menu className="h-5 w-5" />
           </Button>
