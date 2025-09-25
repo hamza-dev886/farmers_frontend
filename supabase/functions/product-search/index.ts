@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
         title,
         description,
         thumbnail,
-        product_variant(
+        product_variants(
           id,
           title,
           sku,
@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
 
     // Get inventory data from product_variants table
     const allVariantIds = productResults?.flatMap(product => 
-      product.product_variant?.map((variant: any) => variant.id) || []
+      product.product_variants?.map((variant: any) => variant.id) || []
     ) || [];
     
     let variantInventoryData: any[] = [];
@@ -171,9 +171,9 @@ Deno.serve(async (req) => {
                 let compareAtPrice = null;
                 let productWeight = null;
                 
-                if (p.product_variant && Array.isArray(p.product_variant) && p.product_variant.length > 0) {
+                if (p.product_variants && Array.isArray(p.product_variants) && p.product_variants.length > 0) {
                   // Product has variants - sum inventory and get pricing from first variant
-                  for (const variant of p.product_variant) {
+                  for (const variant of p.product_variants) {
                     const variantData = variantInventoryData.find(inv => inv.id === variant.id);
                     if (variantData) {
                       totalInventory += variantData.inventory_quantity || 0;
@@ -195,7 +195,7 @@ Deno.serve(async (req) => {
                   price: productPrice,
                   compare_at_price: compareAtPrice,
                   weight: productWeight,
-                  variants: p.product_variant || [],
+                  variants: p.product_variants || [],
                   totalInventory: totalInventory
                 };
               })
