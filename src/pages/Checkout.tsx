@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, CreditCard, MapPin, User } from "lucide-react";
+import { ArrowLeft, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,9 +25,6 @@ export default function Checkout() {
     lastName: "",
     email: "",
     phone: "",
-    address: "",
-    city: "",
-    postalCode: "",
     deliveryNotes: "",
     pickupTime: ""
   });
@@ -106,7 +103,6 @@ export default function Checkout() {
         metadata: {
           customer_name: formData.firstName + ' ' + formData.lastName,
           phone: formData.phone,
-          delivery_address: formData.address + ', ' + formData.city + ', ' + formData.postalCode,
           total_items: getTotalItems(),
           cart_items: items
         }
@@ -135,10 +131,7 @@ export default function Checkout() {
     return formData.firstName && 
            formData.lastName && 
            formData.email && 
-           formData.phone && 
-           formData.address && 
-           formData.city && 
-           formData.postalCode;
+           formData.phone;
   };
 
   if (!user) {
@@ -242,61 +235,26 @@ export default function Checkout() {
                 </CardContent>
               </Card>
 
-              {/* Delivery Address */}
+              {/* Order Notes */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5" />
-                    Delivery Address
-                  </CardTitle>
+                  <CardTitle>Order Notes</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label htmlFor="address">Street Address *</Label>
-                    <Input
-                      id="address"
-                      name="address"
-                      value={formData.address}
-                      onChange={(e) => handleInputChange('address', e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="city">City *</Label>
-                      <Input
-                        id="city"
-                        name="city"
-                        value={formData.city}
-                        onChange={(e) => handleInputChange('city', e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="postalCode">Postal Code *</Label>
-                      <Input
-                        id="postalCode"
-                        name="postalCode"
-                        value={formData.postalCode}
-                        onChange={(e) => handleInputChange('postalCode', e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="deliveryNotes">Delivery Notes (Optional)</Label>
+                    <Label htmlFor="deliveryNotes">Special Instructions (Optional)</Label>
                     <Textarea
                       id="deliveryNotes"
                       name="deliveryNotes"
                       value={formData.deliveryNotes}
                       onChange={(e) => handleInputChange('deliveryNotes', e.target.value)}
-                      placeholder="Any special delivery instructions..."
+                      placeholder="Any special instructions for your order..."
                       className="resize-none"
                       rows={3}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="pickupTime">Pickup Time (Optional)</Label>
+                    <Label htmlFor="pickupTime">Preferred Pickup Time (Optional)</Label>
                     <Input
                       id="pickupTime"
                       name="pickupTime"
@@ -304,23 +262,6 @@ export default function Checkout() {
                       value={formData.pickupTime}
                       onChange={(e) => handleInputChange('pickupTime', e.target.value)}
                     />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Payment Method */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CreditCard className="h-5 w-5" />
-                    Payment Method
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-center text-muted-foreground">
-                      Payment on delivery (Cash or Card)
-                    </p>
                   </div>
                 </CardContent>
               </Card>
