@@ -119,6 +119,14 @@ const FarmerDashboard = () => {
     checkUserAuth();
   }, []);
 
+  // Fetch products and inventory when selectedFarm changes
+  useEffect(() => {
+    if (selectedFarm) {
+      fetchProducts();
+      fetchInventory();
+    }
+  }, [selectedFarm, user]);
+
   const checkUserAuth = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -150,8 +158,7 @@ const FarmerDashboard = () => {
       setIsFarmer(true);
       await fetchCurrentPlan(session.user);
       await fetchFarmData(session.user);
-      await fetchProducts();
-      await fetchInventory();
+      // Products and inventory will be fetched via useEffect when selectedFarm is set
     } catch (error) {
       console.error('Error checking auth:', error);
       navigate('/');
