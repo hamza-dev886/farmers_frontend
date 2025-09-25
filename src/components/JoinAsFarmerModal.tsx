@@ -17,7 +17,15 @@ import { supabase } from "@/integrations/supabase/client";
 
 const farmerApplicationSchema = z.object({
   contactPerson: z.string().min(2, "Contact person name must be at least 2 characters"),
-  email: z.string().email("Please enter a valid email address"),
+  email: z.string()
+    .email("Please enter a valid email address")
+    .refine(email => {
+      // More strict email validation for Supabase compatibility
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      return emailRegex.test(email);
+    }, "Please enter a valid email address")
+    .refine(email => !email.includes('..'), "Email cannot contain consecutive dots")
+    .refine(email => email.length <= 254, "Email address is too long"),
   phone: z.string().min(10, "Please enter a valid phone number"),
   farmName: z.string().min(2, "Farm name must be at least 2 characters"),
   farmAddress: z.string().min(10, "Please provide a detailed address"),
@@ -126,9 +134,23 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
       onOpenChange(false);
     } catch (error: any) {
       console.error('Error submitting application:', error);
+      
+      let errorMessage = "There was an issue submitting your application. Please try again.";
+      
+      // Handle specific email validation errors
+      if (error.message?.includes("email_address_invalid") || error.message?.includes("Email address") && error.message?.includes("invalid")) {
+        errorMessage = "The email address you entered is invalid. Please check the format and try again.";
+      } else if (error.message?.includes("email_rate_limit_exceeded")) {
+        errorMessage = "Too many signup attempts. Please wait a few minutes before trying again.";
+      } else if (error.message?.includes("signup_disabled")) {
+        errorMessage = "New signups are temporarily disabled. Please contact support.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Submission Error",
-        description: error.message || "There was an issue submitting your application. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
