@@ -571,6 +571,15 @@ const FarmerDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  <div className="flex justify-end">
+                    <Button 
+                      onClick={() => selectedFarm && navigate(`/inventory/${selectedFarm.id}`)}
+                      disabled={!selectedFarm}
+                    >
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      Manage Inventory
+                    </Button>
+                  </div>
                   {products.length > 0 ? (
                     <Table>
                       <TableHeader>
