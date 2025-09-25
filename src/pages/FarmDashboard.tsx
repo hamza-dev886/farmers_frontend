@@ -274,6 +274,7 @@ const FarmDashboard = () => {
       if (error && error.code !== 'PGRST116') throw error;
 
       if (data) {
+        console.log('Pricing plan data:', data);
         setCurrentPlan({
           plan_name: data.pricing_plans?.name || 'Unknown',
           price: data.pricing_plans?.price || 'N/A',
@@ -284,6 +285,8 @@ const FarmDashboard = () => {
           can_create_multiple_stand: data.pricing_plans?.can_create_multiple_stand || false,
           allowed_to_business_in_multiple_location: data.pricing_plans?.allowed_to_business_in_multiple_location || false
         });
+      } else {
+        console.log('No pricing plan data found');
       }
     } catch (error) {
       console.error('Error fetching current plan:', error);
