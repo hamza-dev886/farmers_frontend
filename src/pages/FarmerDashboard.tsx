@@ -573,7 +573,7 @@ const FarmerDashboard = () => {
                 <div className="space-y-4">
                   <div className="flex justify-end">
                     <Button 
-                      onClick={() => selectedFarm && navigate(`/inventory/${selectedFarm.id}`)}
+                      onClick={() => selectedFarm && navigate(`/farm/${selectedFarm.id}/inventory`)}
                       disabled={!selectedFarm}
                     >
                       <BarChart3 className="h-4 w-4 mr-2" />
