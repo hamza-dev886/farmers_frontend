@@ -17,15 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const farmerApplicationSchema = z.object({
   contactPerson: z.string().min(2, "Contact person name must be at least 2 characters"),
-  email: z.string()
-    .email("Please enter a valid email address")
-    .refine(email => {
-      // More strict email validation for Supabase compatibility
-      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-      return emailRegex.test(email);
-    }, "Please enter a valid email address")
-    .refine(email => !email.includes('..'), "Email cannot contain consecutive dots")
-    .refine(email => email.length <= 254, "Email address is too long"),
+  email: z.string().min(1, "Email is required"),
   phone: z.string().min(10, "Please enter a valid phone number"),
   farmName: z.string().min(2, "Farm name must be at least 2 characters"),
   farmAddress: z.string().min(10, "Please provide a detailed address"),
@@ -87,15 +79,6 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
       const tempPassword = generatePassword();
 
       // Create user account with temporary password using regular signup
-      console.log('Attempting signup with email:', data.email);
-      console.log('Email validation passed client-side');
-      
-      // Try to validate email format more strictly before sending to Supabase
-      const strictEmailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-      if (!strictEmailRegex.test(data.email)) {
-        throw new Error("Please use a different email address format");
-      }
-
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: tempPassword,
@@ -108,8 +91,6 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
           }
         }
       });
-
-      console.log('Supabase signup response:', { authData, authError });
 
       if (authError) throw authError;
 
