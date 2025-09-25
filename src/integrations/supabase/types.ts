@@ -6410,6 +6410,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_farmer_application: {
+        Args: { application_id: string; approved_by_admin: string }
+        Returns: boolean
+      }
       create_first_admin: {
         Args: Record<PropertyKey, never>
         Returns: undefined

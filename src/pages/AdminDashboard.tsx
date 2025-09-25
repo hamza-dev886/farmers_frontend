@@ -581,90 +581,52 @@ const AdminDashboard = () => {
         return;
       }
 
-      // Handle approve/reject actions
-      const updateData = {
-        approval_status: action === 'approve' ? 'approved' : 'rejected',
-        approved_at: new Date().toISOString(),
-        approved_by: user.id
-      };
-
-      const { error } = await supabase
-        .from('farmer_applications')
-        .update(updateData)
-        .eq('id', applicationId);
-
-      if (error) throw error;
-
-      // If approved, create a farm entry
       if (action === 'approve') {
-        const application = applications.find(app => app.id === applicationId);
-        if (application) {
-          const { error: farmError } = await supabase
-            .from('farms')
-            .insert({
-              farmer_id: application.user_id,
-              name: application.farm_name,
-              address: application.farm_address,
-              bio: application.farm_bio,
-              contact_person: application.contact_person,
-              email: application.email,
-              phone: application.phone,
-              location: null // Will be set later if needed
-            });
+        // Use the new approve_farmer_application function for robust approval handling
+        const { data, error } = await supabase.rpc('approve_farmer_application', {
+          application_id: applicationId,
+          approved_by_admin: user.id
+        });
 
-          if (farmError) {
-            console.error('Error creating farm:', farmError);
-            throw farmError;
-          }
-
-          // Update user role to farmer
-          const { error: roleError } = await supabase
-            .from('profiles')
-            .update({ role: 'farmer' })
-            .eq('id', application.user_id);
-
-          if (roleError) {
-            console.error('Error updating user role:', roleError);
-            throw roleError;
-          }
-
-          // Assign farmer to free pricing plan
-          const { data: freePlan } = await supabase
-            .from('pricing_plans')
-            .select('id')
-            .eq('name', 'Free (Starter)')
-            .single();
-
-          if (freePlan) {
-            const { error: planError } = await supabase
-              .from('farm_pricing_plans')
-              .insert({
-                user_id: application.user_id,
-                pricing_plan_id: freePlan.id,
-                assigned_by: user?.id,
-                is_active: true
-              });
-
-            if (planError && planError.code !== '23505') { // Ignore duplicate key errors
-              console.error('Error assigning pricing plan:', planError);
-            }
-          }
+        if (error) {
+          console.error('Error approving application:', error);
+          throw error;
         }
+
+        toast({
+          title: "Success",
+          description: "Application approved successfully. Farm and farmer account created!"
+        });
+      } else if (action === 'reject') {
+        // Handle reject action
+        const updateData = {
+          approval_status: 'rejected',
+          approved_at: new Date().toISOString(),
+          approved_by: user.id
+        };
+
+        const { error } = await supabase
+          .from('farmer_applications')
+          .update(updateData)
+          .eq('id', applicationId);
+
+        if (error) throw error;
+
+        // Log admin action
+        await supabase.rpc('log_admin_action', {
+          action_type: 'farmer_application_reject',
+          target_user_id: applications.find(app => app.id === applicationId)?.user_id,
+          action_details: { application_id: applicationId }
+        });
+
+        toast({
+          title: "Success",
+          description: "Application rejected successfully."
+        });
       }
 
-      // Log admin action
-      await supabase.rpc('log_admin_action', {
-        action_type: `farmer_application_${action}`,
-        target_user_id: applications.find(app => app.id === applicationId)?.user_id,
-        action_details: { application_id: applicationId }
-      });
-
-      toast({
-        title: "Success",
-        description: `Application ${action}d successfully.`
-      });
-
       await fetchApplications();
+      await fetchFarmerPlans(); // Refresh farmer plans to show newly assigned plans
       setSelectedApplication(null);
       setActionType(null);
     } catch (error) {
@@ -672,7 +634,7 @@ const AdminDashboard = () => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: `Failed to ${action} application.`
+        description: `Failed to ${action} application: ${error.message || 'Unknown error'}`
       });
     }
   };
