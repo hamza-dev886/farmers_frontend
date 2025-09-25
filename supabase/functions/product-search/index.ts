@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
 
     const mapboxToken = configData.value;
 
-    // Search for products and get related farm information
+    // Search for products and get related farm information with variants
     const { data: productResults, error: productError } = await supabase
       .from('product')
       .select(`
@@ -56,6 +56,11 @@ Deno.serve(async (req) => {
         title,
         description,
         thumbnail,
+        product_variant(
+          id,
+          title,
+          sku
+        ),
         farm_products!inner(
           farm_id,
           farms!inner(
@@ -142,7 +147,8 @@ Deno.serve(async (req) => {
                 id: p.id,
                 title: p.title,
                 description: p.description,
-                thumbnail: p.thumbnail
+                thumbnail: p.thumbnail,
+                variants: p.product_variant || []
               }))
           });
         }

@@ -30,17 +30,19 @@ export const SearchResults = ({ searchParams, results, isLoading }: SearchResult
       if (searchParams.searchType !== 'product' || !results.length) return;
 
       try {
-        // Extract all product IDs from results
-        const productIds = results.flatMap(farm => 
-          farm.products?.map((product: any) => product.id) || []
+        // Extract all variant IDs from results
+        const variantIds = results.flatMap(farm => 
+          farm.products?.flatMap((product: any) => 
+            product.variants?.map((variant: any) => variant.id) || []
+          ) || []
         );
 
-        if (productIds.length === 0) return;
+        if (variantIds.length === 0) return;
 
         const { data, error } = await supabase
           .from('inventory_tracking')
           .select('variant_id, quantity_available')
-          .in('variant_id', productIds);
+          .in('variant_id', variantIds);
 
         if (error) throw error;
 
@@ -132,7 +134,9 @@ export const SearchResults = ({ searchParams, results, isLoading }: SearchResult
                           {farm.distance.toFixed(1)} miles away
                         </span>
                         <span className="text-sm font-medium">
-                          {productInventory[product.id] || 0} available
+                          {product.variants?.reduce((total: number, variant: any) => 
+                            total + (productInventory[variant.id] || 0), 0
+                          ) || 0} available
                         </span>
                       </div>
                     </div>
@@ -164,7 +168,11 @@ export const SearchResults = ({ searchParams, results, isLoading }: SearchResult
                         address: farm.address,
                         distance: farm.distance
                       }}
-                      availableQuantity={productInventory[product.id] || 0}
+                      availableQuantity={
+                        product.variants?.reduce((total: number, variant: any) => 
+                          total + (productInventory[variant.id] || 0), 0
+                        ) || 0
+                      }
                     />
                   )) || []
                 )
@@ -209,7 +217,9 @@ export const SearchResults = ({ searchParams, results, isLoading }: SearchResult
                         <p className="text-sm text-muted-foreground mb-2">{farm.name} • {farm.distance.toFixed(1)} miles</p>
                         <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{product.description}</p>
                         <span className="text-xs font-medium text-farm-green">
-                          {productInventory[product.id] || 0} available
+                          {product.variants?.reduce((total: number, variant: any) => 
+                            total + (productInventory[variant.id] || 0), 0
+                          ) || 0} available
                         </span>
                       </div>
                     )) || []
