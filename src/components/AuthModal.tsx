@@ -14,20 +14,17 @@ import { User, UserPlus, Sprout, Wheat } from "lucide-react";
 
 // Validation schemas
 const loginSchema = z.object({
-  email: z.string().trim().min(1, { message: "Email is required" }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" })
+  email: z.string(),
+  password: z.string()
 });
 
 const signupSchema = z.object({
-  email: z.string().trim().min(1, { message: "Email is required" }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  email: z.string(),
+  password: z.string(),
   confirmPassword: z.string(),
-  fullName: z.string().trim().min(1, { message: "Full name is required" }),
-  phone: z.string().trim().optional(),
-  role: z.enum(['customer', 'farmer'], { message: "Please select a valid role" })
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
+  fullName: z.string(),
+  phone: z.string().optional(),
+  role: z.enum(['customer', 'farmer'])
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
