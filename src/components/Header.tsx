@@ -34,6 +34,7 @@ export const Header = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -42,11 +43,18 @@ export const Header = () => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state change:', event, session?.user?.id);
+        
+        // If we're in the process of logging out, don't process the session change
+        if (isLoggingOut) {
+          return;
+        }
+        
         setSession(session);
         setUser(session?.user ?? null);
         
         // Fetch user profile if logged in
-        if (session?.user) {
+        if (session?.user && event !== 'SIGNED_OUT') {
           setTimeout(async () => {
             try {
               const { data: profile } = await supabase
@@ -56,11 +64,13 @@ export const Header = () => {
                 .single();
               setUserProfile(profile);
               
-              // Redirect users based on their role
-              if (profile?.role === 'admin' && window.location.pathname === '/') {
-                navigate('/admin');
-              } else if (profile?.role === 'farmer' && window.location.pathname === '/') {
-                navigate('/farmer-dashboard');
+              // Only redirect on initial sign in, not on every auth state change
+              if (event === 'SIGNED_IN') {
+                if (profile?.role === 'admin' && window.location.pathname === '/') {
+                  navigate('/admin');
+                } else if (profile?.role === 'farmer' && window.location.pathname === '/') {
+                  navigate('/farmer-dashboard');
+                }
               }
               
               // Check if password is expired and show password change modal
@@ -77,47 +87,59 @@ export const Header = () => {
       }
     );
 
-    // Check for existing session
+    // Check for existing session only once on component mount
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      if (!isLoggingOut) {
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, isLoggingOut]);
 
   const handleSignOut = async () => {
     try {
+      // Set logging out flag to prevent auth state change processing
+      setIsLoggingOut(true);
+      
       // Clear the session state immediately for better UX
       setSession(null);
       setUser(null);
       setUserProfile(null);
       
-      const { error } = await supabase.auth.signOut();
+      // Sign out from Supabase with scope 'local' to avoid the session_not_found error
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
       
-      // Even if there's an error (like session already expired), 
-      // we still consider it a successful logout since we cleared the local state
+      if (error) {
+        console.warn('Logout warning (but continuing):', error);
+      }
+      
       toast({
         title: "Signed out",
         description: "You have been successfully signed out."
       });
       
-      // Force refresh the page to completely destroy the session
-      window.location.href = '/';
+      // Reset the logging out flag
+      setIsLoggingOut(false);
+      
+      // Navigate to home page instead of forcing a full refresh
+      navigate('/');
     } catch (error) {
       console.error('Sign out error:', error);
+      
       // Still clear the state and redirect even if there's an error
       setSession(null);
       setUser(null);
       setUserProfile(null);
+      setIsLoggingOut(false);
       
       toast({
         title: "Signed out",
         description: "You have been signed out."
       });
       
-      // Force refresh the page
-      window.location.href = '/';
+      navigate('/');
     }
   };
 
