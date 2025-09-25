@@ -24,7 +24,7 @@ const signupSchema = z.object({
   confirmPassword: z.string(),
   fullName: z.string(),
   phone: z.string().optional(),
-  role: z.enum(['customer', 'farmer'])
+  role: z.enum(['shopper', 'farmer'])
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -56,7 +56,7 @@ export const AuthModal = ({ open, onOpenChange, onOpenFarmerModal }: AuthModalPr
     confirmPassword: '',
     fullName: '',
     phone: '',
-    role: 'customer'
+    role: 'shopper'
   });
   const [signupErrors, setSignupErrors] = useState<Record<string, string>>({});
 
@@ -224,7 +224,7 @@ export const AuthModal = ({ open, onOpenChange, onOpenFarmerModal }: AuthModalPr
         return 'Manage the platform and oversee operations';
       case 'farmer':
         return 'List your farm and sell products directly to customers';
-      case 'customer':
+      case 'shopper':
         return 'Browse farms and purchase fresh local products';
       default:
         return '';
@@ -314,7 +314,7 @@ export const AuthModal = ({ open, onOpenChange, onOpenFarmerModal }: AuthModalPr
                       <Label htmlFor="signup-role">Account Type</Label>
                       <Select
                         value={signupForm.role}
-                        onValueChange={(value: 'customer' | 'farmer') => {
+                        onValueChange={(value: 'shopper' | 'farmer') => {
                           if (value === 'farmer') {
                             onOpenChange(false);
                             onOpenFarmerModal?.();
@@ -328,11 +328,11 @@ export const AuthModal = ({ open, onOpenChange, onOpenFarmerModal }: AuthModalPr
                           <SelectValue placeholder="Select your role" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="customer">
+                          <SelectItem value="shopper">
                             <div className="flex items-center gap-2">
-                              {getRoleIcon('customer')}
+                              {getRoleIcon('shopper')}
                               <div>
-                                <div className="font-medium">🛒 Customer</div>
+                                <div className="font-medium">🛒 Shopper</div>
                                 <div className="text-xs text-muted-foreground">
                                   Browse and purchase fresh local products
                                 </div>
