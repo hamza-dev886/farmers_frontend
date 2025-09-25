@@ -82,17 +82,22 @@ Deno.serve(async (req) => {
       throw new Error(`Database error: ${productError.message || 'Unknown database error'}`);
     }
 
-    // Get inventory data separately
+    // Get inventory data separately - check both variant IDs and product IDs
     const allVariantIds = productResults?.flatMap(product => 
       product.product_variant?.map((variant: any) => variant.id) || []
     ) || [];
+    
+    const allProductIds = productResults?.map(product => product.id) || [];
+    
+    // Combine both variant IDs and product IDs for inventory lookup
+    const allInventoryIds = [...allVariantIds, ...allProductIds];
 
     let inventoryData: any[] = [];
-    if (allVariantIds.length > 0) {
+    if (allInventoryIds.length > 0) {
       const { data: inventory, error: inventoryError } = await supabase
         .from('inventory_tracking')
         .select('variant_id, quantity_available')
-        .in('variant_id', allVariantIds);
+        .in('variant_id', allInventoryIds);
 
       if (!inventoryError && inventory) {
         inventoryData = inventory;
@@ -161,14 +166,22 @@ Deno.serve(async (req) => {
                 return fps && fps.length > 0 && fps[0].farms.id === farm.id;
               })
               .map(p => {
-                // Calculate total inventory for this product using the separate inventory data
+                // Calculate total inventory for this product
                 let totalInventory = 0;
-                if (p.product_variant && Array.isArray(p.product_variant)) {
+                
+                if (p.product_variant && Array.isArray(p.product_variant) && p.product_variant.length > 0) {
+                  // Product has variants - sum inventory for all variants
                   for (const variant of p.product_variant) {
                     const inventoryRecord = inventoryData.find(inv => inv.variant_id === variant.id);
                     if (inventoryRecord) {
                       totalInventory += inventoryRecord.quantity_available || 0;
                     }
+                  }
+                } else {
+                  // Product has no variants - check inventory using product ID directly
+                  const inventoryRecord = inventoryData.find(inv => inv.variant_id === p.id);
+                  if (inventoryRecord) {
+                    totalInventory = inventoryRecord.quantity_available || 0;
                   }
                 }
                 
