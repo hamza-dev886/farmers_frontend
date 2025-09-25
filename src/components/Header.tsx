@@ -105,17 +105,17 @@ export const Header = () => {
       // Set logging out flag to prevent auth state change processing
       setIsLoggingOut(true);
       
-      // Clear the session state immediately for better UX
+      // Try to sign out from Supabase first
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.warn('Logout error:', error);
+      }
+      
+      // Clear the session state after logout attempt
       setSession(null);
       setUser(null);
       setUserProfile(null);
-      
-      // Sign out from Supabase with scope 'local' to avoid the session_not_found error
-      const { error } = await supabase.auth.signOut({ scope: 'local' });
-      
-      if (error) {
-        console.warn('Logout warning (but continuing):', error);
-      }
       
       toast({
         title: "Signed out",
@@ -125,23 +125,30 @@ export const Header = () => {
       // Reset the logging out flag
       setIsLoggingOut(false);
       
-      // Navigate to home page instead of forcing a full refresh
-      navigate('/');
+      // Clear local storage manually to ensure session is gone
+      localStorage.removeItem('sb-ahzhkzqsaxvzixiivupb-auth-token');
+      
+      // Force a page reload to completely clear the session
+      window.location.href = '/';
     } catch (error) {
       console.error('Sign out error:', error);
       
-      // Still clear the state and redirect even if there's an error
+      // For any error, force clear everything and reload the page
       setSession(null);
       setUser(null);
       setUserProfile(null);
       setIsLoggingOut(false);
+      
+      // Clear local storage manually
+      localStorage.removeItem('sb-ahzhkzqsaxvzixiivupb-auth-token');
       
       toast({
         title: "Signed out",
         description: "You have been signed out."
       });
       
-      navigate('/');
+      // Force a page reload to completely clear the session
+      window.location.href = '/';
     }
   };
 
