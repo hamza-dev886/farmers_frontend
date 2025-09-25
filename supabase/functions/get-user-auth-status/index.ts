@@ -23,6 +23,11 @@ const handler = async (req: Request): Promise<Response> => {
       }
     });
 
+    // Get all users from auth.users first
+    const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+    
+    if (authError) throw authError;
+
     // Get all users from profiles table
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
@@ -31,25 +36,19 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (profilesError) throw profilesError;
 
-    // Get auth status for each user
-    const usersWithAuthStatus = await Promise.all(
-      (profiles || []).map(async (profile) => {
-        try {
-          const { data: authUser, error } = await supabase.auth.admin.getUserById(profile.id);
-          
-          return {
-            ...profile,
-            email_confirmed_at: error ? null : authUser?.user?.email_confirmed_at || null
-          };
-        } catch (error) {
-          console.error(`Error fetching auth status for user ${profile.id}:`, error);
-          return {
-            ...profile,
-            email_confirmed_at: null
-          };
-        }
-      })
-    );
+    // Combine auth users with profile data
+    const usersWithAuthStatus = (authUsers.users || []).map((authUser) => {
+      const profile = profiles?.find(p => p.id === authUser.id);
+      
+      return {
+        id: authUser.id,
+        email: authUser.email || profile?.email || 'No email',
+        full_name: profile?.full_name || authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'No name',
+        role: profile?.role || authUser.user_metadata?.role || 'customer',
+        created_at: profile?.created_at || authUser.created_at,
+        email_confirmed_at: authUser.email_confirmed_at || null
+      };
+    });
 
     console.log(`Fetched auth status for ${usersWithAuthStatus.length} users`);
 
