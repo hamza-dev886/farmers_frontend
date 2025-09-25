@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
 
     const mapboxToken = configData.value;
 
-    // Search for products and get related farm information with variants and inventory
+    // Search for products and get related farm information with variants
     const { data: productResults, error: productError } = await supabase
       .from('product')
       .select(`
@@ -59,10 +59,7 @@ Deno.serve(async (req) => {
         product_variant(
           id,
           title,
-          sku,
-          inventory_tracking(
-            quantity_available
-          )
+          sku
         ),
         farm_products!inner(
           farm_id,
@@ -82,7 +79,24 @@ Deno.serve(async (req) => {
       .eq('status', 'published');
 
     if (productError) {
-      throw new Error(`Database error: ${productError.message}`);
+      throw new Error(`Database error: ${productError.message || 'Unknown database error'}`);
+    }
+
+    // Get inventory data separately
+    const allVariantIds = productResults?.flatMap(product => 
+      product.product_variant?.map((variant: any) => variant.id) || []
+    ) || [];
+
+    let inventoryData: any[] = [];
+    if (allVariantIds.length > 0) {
+      const { data: inventory, error: inventoryError } = await supabase
+        .from('inventory_tracking')
+        .select('variant_id, quantity_available')
+        .in('variant_id', allVariantIds);
+
+      if (!inventoryError && inventory) {
+        inventoryData = inventory;
+      }
     }
 
     console.log(`Found ${productResults?.length || 0} products matching "${searchQuery}"`);
@@ -147,14 +161,13 @@ Deno.serve(async (req) => {
                 return fps && fps.length > 0 && fps[0].farms.id === farm.id;
               })
               .map(p => {
-                // Calculate total inventory for this product
+                // Calculate total inventory for this product using the separate inventory data
                 let totalInventory = 0;
                 if (p.product_variant && Array.isArray(p.product_variant)) {
                   for (const variant of p.product_variant) {
-                    if (variant.inventory_tracking && Array.isArray(variant.inventory_tracking)) {
-                      totalInventory += variant.inventory_tracking.reduce((sum: number, inv: any) => 
-                        sum + (inv.quantity_available || 0), 0
-                      );
+                    const inventoryRecord = inventoryData.find(inv => inv.variant_id === variant.id);
+                    if (inventoryRecord) {
+                      totalInventory += inventoryRecord.quantity_available || 0;
                     }
                   }
                 }
