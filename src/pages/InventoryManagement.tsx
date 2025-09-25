@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Package, AlertTriangle, TrendingDown } from 'lucide-react';
+import { Plus, Search, Package, AlertTriangle, TrendingDown, ArrowLeft } from 'lucide-react';
+import { Header } from '@/components/Header';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { InventoryTable } from '@/components/inventory/InventoryTable';
@@ -40,6 +41,7 @@ interface Product {
 
 export default function InventoryManagement() {
   const { farmId } = useParams<{ farmId: string }>();
+  const navigate = useNavigate();
   const { toast } = useToast();
   
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -248,19 +250,31 @@ export default function InventoryManagement() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Inventory Management</h1>
-          <p className="text-muted-foreground">
-            Manage your product variants and track inventory levels
-          </p>
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-4 mb-4">
+              <Button 
+                variant="outline" 
+                onClick={() => navigate(`/farm/${farmId}`)}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Farm Dashboard
+              </Button>
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight">Inventory Management</h1>
+            <p className="text-muted-foreground">
+              Manage your product variants and track inventory levels
+            </p>
+          </div>
+          <Button onClick={handleAddItem} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Add Product Variant
+          </Button>
         </div>
-        <Button onClick={handleAddItem} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Add Product Variant
-        </Button>
-      </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -347,6 +361,7 @@ export default function InventoryManagement() {
         products={products}
         farmId={farmId}
       />
+      </main>
     </div>
   );
 }
