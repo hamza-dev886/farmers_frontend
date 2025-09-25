@@ -78,17 +78,15 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
       // Generate temporary password
       const tempPassword = generatePassword();
 
-      // Create user account with temporary password
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Create user account with temporary password using admin method
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: data.email,
         password: tempPassword,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            full_name: data.contactPerson,
-            role: 'farmer',
-            password_expired: true
-          }
+        email_confirm: false,
+        user_metadata: {
+          full_name: data.contactPerson,
+          role: 'farmer',
+          password_expired: true
         }
       });
 
@@ -96,6 +94,22 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
 
       if (!authData.user) {
         throw new Error("User creation failed");
+      }
+
+      // Ensure profile record exists (create if trigger didn't work)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: authData.user.id,
+          email: data.email,
+          full_name: data.contactPerson,
+          role: 'farmer',
+          password_expired: true
+        });
+
+      if (profileError) {
+        console.error('Error creating profile:', profileError);
+        throw profileError;
       }
 
       // Submit farmer application with the new user's ID
