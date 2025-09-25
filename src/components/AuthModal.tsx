@@ -19,10 +19,10 @@ const loginSchema = z.object({
 });
 
 const signupSchema = z.object({
-  email: z.string().trim().min(1, { message: "Email is required" }).max(255, { message: "Email must be less than 255 characters" }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters" }).max(100, { message: "Password must be less than 100 characters" }),
+  email: z.string().trim().min(1, { message: "Email is required" }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
   confirmPassword: z.string(),
-  fullName: z.string().trim().min(1, { message: "Full name is required" }).max(100, { message: "Name must be less than 100 characters" }),
+  fullName: z.string().trim().min(1, { message: "Full name is required" }),
   phone: z.string().trim().optional(),
   role: z.enum(['customer', 'farmer'], { message: "Please select a valid role" })
 }).refine((data) => data.password === data.confirmPassword, {
@@ -270,7 +270,7 @@ export const AuthModal = ({ open, onOpenChange, onOpenFarmerModal }: AuthModalPr
                       <Label htmlFor="login-email">Email</Label>
                       <Input
                         id="login-email"
-                        type="email"
+                        type="text"
                         placeholder="Enter your email"
                         value={loginForm.email}
                         onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
@@ -380,7 +380,7 @@ export const AuthModal = ({ open, onOpenChange, onOpenFarmerModal }: AuthModalPr
                       <Label htmlFor="signup-email">Email</Label>
                       <Input
                         id="signup-email"
-                        type="email"
+                        type="text"
                         placeholder="Enter your email"
                         value={signupForm.email}
                         onChange={(e) => setSignupForm({ ...signupForm, email: e.target.value })}
