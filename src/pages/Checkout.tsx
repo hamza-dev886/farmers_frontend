@@ -15,11 +15,13 @@ import { supabase } from "@/integrations/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 export default function Checkout() {
-  const { items, getTotalItems, clearCart } = useCart();
+  const { items, getTotalItems, getTotalPrice, clearCart } = useCart();
   const navigate = useNavigate();
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [farmPricingPlans, setFarmPricingPlans] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -28,6 +30,87 @@ export default function Checkout() {
     deliveryNotes: "",
     pickupTime: ""
   });
+
+  // Fetch pricing plans for all farms in cart
+  useEffect(() => {
+    const fetchFarmPricingPlans = async () => {
+      const uniqueFarmIds = [...new Set(items.map(item => item.farmId))];
+      
+      if (uniqueFarmIds.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const pricingPromises = uniqueFarmIds.map(async (farmId) => {
+          // Get farm info to find farmer_id
+          const { data: farmData } = await supabase
+            .from('farms')
+            .select('farmer_id')
+            .eq('id', farmId)
+            .single();
+
+          if (farmData) {
+            // Get farmer's pricing plan
+            const { data: pricingData } = await supabase
+              .from('farm_pricing_plans')
+              .select(`
+                pricing_plans (
+                  transaction_fee,
+                  name
+                )
+              `)
+              .eq('user_id', farmData.farmer_id)
+              .eq('is_active', true)
+              .single();
+
+            return {
+              farmId,
+              pricingPlan: pricingData?.pricing_plans || { transaction_fee: 0.05, name: 'Default' }
+            };
+          }
+          return { farmId, pricingPlan: { transaction_fee: 0.05, name: 'Default' } };
+        });
+
+        const results = await Promise.all(pricingPromises);
+        const pricingMap = results.reduce((acc, result) => {
+          acc[result.farmId] = result.pricingPlan;
+          return acc;
+        }, {} as Record<string, any>);
+
+        setFarmPricingPlans(pricingMap);
+      } catch (error) {
+        console.error('Error fetching pricing plans:', error);
+        // Set default pricing plans
+        const defaultPricing = uniqueFarmIds.reduce((acc, farmId) => {
+          acc[farmId] = { transaction_fee: 0.05, name: 'Default' };
+          return acc;
+        }, {} as Record<string, any>);
+        setFarmPricingPlans(defaultPricing);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFarmPricingPlans();
+  }, [items]);
+
+  // Calculate totals with safety checks
+  const subtotal = items.reduce((total, item) => {
+    const price = item.price || 0;
+    return total + (price * item.quantity);
+  }, 0);
+  
+  const transactionFees = items.reduce((total, item) => {
+    const price = item.price || 0;
+    const pricingPlan = farmPricingPlans[item.farmId];
+    if (pricingPlan && price > 0) {
+      const itemTotal = price * item.quantity;
+      return total + (itemTotal * pricingPlan.transaction_fee);
+    }
+    return total;
+  }, 0);
+  const totalAmount = subtotal + transactionFees;
 
   // Check authentication status
   useEffect(() => {
@@ -104,6 +187,9 @@ export default function Checkout() {
           customer_name: formData.firstName + ' ' + formData.lastName,
           phone: formData.phone,
           total_items: getTotalItems(),
+          subtotal: subtotal,
+          transaction_fees: transactionFees,
+          total_amount: totalAmount,
           cart_items: items
         }
       };
@@ -275,45 +361,86 @@ export default function Checkout() {
                 <CardTitle>Order Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  {items.map((item) => (
-                    <div key={item.id} className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h4 className="font-medium text-sm">{item.title}</h4>
-                        <p className="text-xs text-muted-foreground">From {item.farmName}</p>
-                        <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
-                      </div>
+                {loading ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    <p className="text-sm text-muted-foreground mt-2">Calculating totals...</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-3">
+                      {items.map((item) => (
+                        <div key={item.id} className="flex justify-between items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-sm truncate">{item.title}</h4>
+                            <p className="text-xs text-muted-foreground">From {item.farmName}</p>
+                            <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            {item.price && item.price > 0 ? (
+                              <>
+                                <div className="font-semibold text-sm">
+                                  ${(item.price * item.quantity).toFixed(2)}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  ${item.price.toFixed(2)} each
+                                </div>
+                              </>
+                            ) : (
+                              <div className="text-xs text-muted-foreground">
+                                Price not available
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                
-                <Separator />
-                
-                <div className="flex justify-between items-center font-semibold">
-                  <span>Total Items:</span>
-                  <span>{getTotalItems()}</span>
-                </div>
-                
-                <Separator />
-                
-                <Button 
-                  type="submit"
-                  onClick={handleSubmit}
-                  disabled={!isFormValid() || isProcessing}
-                  variant="farm" 
-                  className="w-full"
-                  size="lg"
-                >
-                  {isProcessing ? "Processing..." : "Place Order"}
-                </Button>
-                
-                <Button
-                  onClick={() => navigate('/cart')}
-                  variant="outline"
-                  className="w-full"
-                >
-                  Back to Cart
-                </Button>
+                    
+                    <Separator />
+                    
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span>Subtotal ({getTotalItems()} items):</span>
+                        <span className="font-semibold">${subtotal.toFixed(2)}</span>
+                      </div>
+                      
+                      {transactionFees > 0 && (
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">Transaction fees:</span>
+                          <span className="text-muted-foreground">${transactionFees.toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div className="flex justify-between items-center text-lg font-bold">
+                      <span>Total:</span>
+                      <span>${totalAmount.toFixed(2)}</span>
+                    </div>
+                    
+                    <Separator />
+                    
+                    <Button 
+                      type="submit"
+                      onClick={handleSubmit}
+                      disabled={!isFormValid() || isProcessing}
+                      variant="farm" 
+                      className="w-full"
+                      size="lg"
+                    >
+                      {isProcessing ? "Processing..." : `Place Order - $${totalAmount.toFixed(2)}`}
+                    </Button>
+                    
+                    <Button
+                      onClick={() => navigate('/cart')}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      Back to Cart
+                    </Button>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
