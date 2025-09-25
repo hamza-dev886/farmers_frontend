@@ -7,7 +7,17 @@ import { MapboxAutocomplete } from "@/components/ui/mapbox-autocomplete";
 import { MapboxMapPreview } from "@/components/ui/mapbox-map-preview";
 import heroImage from "@/assets/farm-hero.jpg";
 
-export const Hero = () => {
+interface HeroProps {
+  onSearch?: (searchParams: {
+    address: string;
+    coordinates: [number, number] | null;
+    searchType: string;
+    searchQuery: string;
+    maxDistance: string;
+  }) => void;
+}
+
+export const Hero = ({ onSearch }: HeroProps) => {
   const [address, setAddress] = useState("");
   const [coordinates, setCoordinates] = useState<[number, number] | null>(null);
   const [searchType, setSearchType] = useState("");
@@ -20,16 +30,16 @@ export const Hero = () => {
       return;
     }
     
-    console.log("Search params:", {
-      address,
-      coordinates,
-      searchType,
-      searchQuery,
-      maxDistance
-    });
-    
-    // TODO: Implement search logic
-    alert(`Searching for ${searchType}: "${searchQuery}" within ${maxDistance} miles of ${address}`);
+    // Pass search parameters to parent component
+    if (onSearch) {
+      onSearch({
+        address,
+        coordinates,
+        searchType,
+        searchQuery,
+        maxDistance
+      });
+    }
   };
 
   return (

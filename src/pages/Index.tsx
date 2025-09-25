@@ -15,6 +15,7 @@ import { useViewMode } from "@/hooks/useViewMode";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { SearchResults } from "@/components/SearchResults";
 
 interface Farm {
   id: string;
@@ -32,6 +33,9 @@ interface Farm {
 const Index = () => {
   const { viewMode, setViewMode } = useViewMode();
   const [showFilters, setShowFilters] = useState(false);
+  const [searchParams, setSearchParams] = useState<any>(null);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
 
@@ -71,10 +75,37 @@ const Index = () => {
     }
   });
 
+  const handleSearch = async (params: any) => {
+    setSearchParams(params);
+    setIsSearching(true);
+    
+    try {
+      // Mock search logic - replace with actual search implementation
+      const mockResults = farms.filter(farm => 
+        farm.name.toLowerCase().includes(params.searchQuery.toLowerCase()) ||
+        farm.address.toLowerCase().includes(params.searchQuery.toLowerCase())
+      );
+      
+      setSearchResults(mockResults);
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <Hero />
+      <Hero onSearch={handleSearch} />
+      {searchParams && (
+        <SearchResults 
+          searchParams={searchParams}
+          results={searchResults}
+          isLoading={isSearching}
+        />
+      )}
     </div>
   );
 };
