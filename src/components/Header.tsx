@@ -285,8 +285,8 @@ export const Header = () => {
             </Button>
           )}
           
-          {/* Hide "Join as Farmer" button for admin and farmer users */}
-          {userProfile?.role !== 'admin' && userProfile?.role !== 'farmer' && (
+          {/* Hide "Join as Farmer" button for admin, farmer, and shopper users */}
+          {userProfile?.role !== 'admin' && userProfile?.role !== 'farmer' && userProfile?.role !== 'shopper' && (
             <Button 
               variant="farm" 
               className="hidden sm:flex"
