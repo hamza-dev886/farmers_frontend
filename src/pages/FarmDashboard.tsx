@@ -140,7 +140,7 @@ const FarmDashboard = () => {
       }
 
       await fetchFarmData();
-      await fetchCurrentPlan();
+      await fetchCurrentPlan(session.user);
     } catch (error) {
       console.error('Error checking auth:', error);
       navigate('/');
@@ -249,15 +249,16 @@ const FarmDashboard = () => {
     }
   };
 
-  const fetchCurrentPlan = async () => {
-    console.log('fetchCurrentPlan called, user:', user);
-    if (!user) {
+  const fetchCurrentPlan = async (currentUser?: any) => {
+    console.log('fetchCurrentPlan called, user:', currentUser || user);
+    const userToUse = currentUser || user;
+    if (!userToUse) {
       console.log('No user found, skipping pricing plan fetch');
       return;
     }
 
     try {
-      console.log('Fetching pricing plan for user ID:', user.id);
+      console.log('Fetching pricing plan for user ID:', userToUse.id);
       const { data, error } = await supabase
         .from('farm_pricing_plans')
         .select(`
@@ -272,7 +273,7 @@ const FarmDashboard = () => {
             allowed_to_business_in_multiple_location
           )
         `)
-        .eq('user_id', user.id)
+        .eq('user_id', userToUse.id)
         .eq('is_active', true)
         .single();
 
