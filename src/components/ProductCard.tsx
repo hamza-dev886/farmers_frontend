@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { useCart } from "@/contexts/CartContext";
 
 interface ProductCardProps {
   product: {
@@ -23,6 +24,7 @@ interface ProductCardProps {
 
 export const ProductCard = ({ product, farm, availableQuantity = 0 }: ProductCardProps) => {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const { addToCart } = useCart();
 
   const handleAddToCart = async () => {
     if (availableQuantity <= 0) {
@@ -33,8 +35,17 @@ export const ProductCard = ({ product, farm, availableQuantity = 0 }: ProductCar
     setIsAddingToCart(true);
     
     try {
-      // TODO: Implement actual cart functionality
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
+      // Add to cart
+      addToCart({
+        id: `${product.id}-${farm.id}`, // Unique cart item ID
+        productId: product.id,
+        title: product.title,
+        thumbnail: product.thumbnail,
+        farmName: farm.name,
+        farmId: farm.id,
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, 300)); // Small delay for UX
       toast.success(`${product.title} added to cart!`);
     } catch (error) {
       toast.error("Failed to add product to cart");

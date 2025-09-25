@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { Wheat, Menu, Heart, User as UserIcon, LogOut } from "lucide-react";
+import { Wheat, Menu, Heart, User as UserIcon, LogOut, ShoppingCart } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { useCart } from "@/contexts/CartContext";
 import { Button } from "@/components/ui/button";
 import { 
   NavigationMenu, 
@@ -27,6 +29,7 @@ import { useNavigate } from "react-router-dom";
 import type { User, Session } from "@supabase/supabase-js";
 
 export const Header = () => {
+  const { getTotalItems } = useCart();
   const { setViewMode } = useViewMode();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -218,6 +221,21 @@ export const Header = () => {
         )}
         
         <div className="flex items-center gap-2">
+          {/* Cart Icon - Only show for non-admin/farmer users */}
+          {userProfile?.role !== 'admin' && userProfile?.role !== 'farmer' && (
+            <Button variant="ghost" size="icon" className="relative">
+              <ShoppingCart className="h-5 w-5" />
+              {getTotalItems() > 0 && (
+                <Badge 
+                  variant="destructive" 
+                  className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                >
+                  {getTotalItems()}
+                </Badge>
+              )}
+            </Button>
+          )}
+          
           <Button variant="ghost" size="icon" className="hidden sm:flex">
             <Heart className="h-5 w-5" />
           </Button>
