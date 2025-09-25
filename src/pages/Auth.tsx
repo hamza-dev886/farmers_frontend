@@ -134,13 +134,10 @@ const Auth = () => {
       // Validate form
       const validatedData = signupSchema.parse(signupForm);
 
-      const redirectUrl = `${window.location.origin}/`;
-
       const { error } = await supabase.auth.signUp({
         email: validatedData.email,
         password: validatedData.password,
         options: {
-          emailRedirectTo: redirectUrl,
           data: {
             full_name: validatedData.fullName,
             phone: validatedData.phone || null,
@@ -168,7 +165,7 @@ const Auth = () => {
 
       toast({
         title: "Account created successfully!",
-        description: "Please check your email to verify your account."
+        description: "You can now sign in with your new account."
       });
 
       // Switch to login tab
