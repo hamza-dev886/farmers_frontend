@@ -26,8 +26,20 @@ interface InventoryItem {
   last_updated_by: string;
   created_at: string;
   updated_at: string;
+  unit_type: string;
+  price_per_unit: number;
+  total_price: number;
   product_name?: string;
+  variant_title?: string;
   sku?: string;
+}
+
+interface ProductVariant {
+  id: string;
+  title: string;
+  sku?: string;
+  product_id: string;
+  product_title?: string;
 }
 
 interface Product {
@@ -35,6 +47,7 @@ interface Product {
   title: string;
   handle: string;
   status: string;
+  variants?: ProductVariant[];
 }
 
 interface FarmData {

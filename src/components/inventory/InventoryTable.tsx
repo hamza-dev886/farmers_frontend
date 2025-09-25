@@ -18,8 +18,12 @@ interface InventoryItem {
   last_updated_by: string;
   created_at: string;
   updated_at: string;
+  unit_type: string;
+  price_per_unit: number;
+  total_price: number;
   // Join fields from product if needed
   product_name?: string;
+  variant_title?: string;
   sku?: string;
 }
 
@@ -117,7 +121,8 @@ export function InventoryTable({ items, onEdit, onDelete, onAdjustStock, loading
               <TableHead>Product/Location</TableHead>
               <TableHead>Available</TableHead>
               <TableHead>Reserved</TableHead>
-              <TableHead>Low Stock Alert</TableHead>
+              <TableHead>Unit & Price</TableHead>
+              <TableHead>Total Value</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Quick Adjust</TableHead>
               <TableHead>Actions</TableHead>
@@ -134,6 +139,11 @@ export function InventoryTable({ items, onEdit, onDelete, onAdjustStock, loading
                         <Package className="h-4 w-4 text-muted-foreground" />
                         {item.product_name || `Variant ${item.variant_id.slice(0, 8)}`}
                       </div>
+                      {item.variant_title && (
+                        <div className="text-sm text-muted-foreground">
+                          {item.variant_title} {item.sku && `(${item.sku})`}
+                        </div>
+                      )}
                       <div className="text-sm text-muted-foreground">
                         📍 {item.location || 'Main Storage'}
                       </div>
@@ -153,7 +163,24 @@ export function InventoryTable({ items, onEdit, onDelete, onAdjustStock, loading
                     </div>
                   </TableCell>
                   <TableCell>{item.quantity_reserved}</TableCell>
-                  <TableCell>{item.low_stock_threshold}</TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium">
+                        {item.unit_type}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        ${item.price_per_unit.toFixed(2)} per {item.unit_type}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="font-medium">
+                      ${item.total_price.toFixed(2)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {item.quantity_available} × ${item.price_per_unit.toFixed(2)}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Badge variant={stockStatus.variant}>
                       {stockStatus.status}

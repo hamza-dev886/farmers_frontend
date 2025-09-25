@@ -16,12 +16,23 @@ interface InventoryItem {
   low_stock_threshold: number;
   location: string;
   notes: string;
+  unit_type: string;
+  price_per_unit: number;
+  total_price: number;
+}
+
+interface ProductVariant {
+  id: string;
+  title: string;
+  sku?: string;
+  product_id: string;
+  product_title?: string;
 }
 
 interface Product {
   id: string;
   title: string;
-  variants?: Array<{ id: string; title?: string; sku?: string; }>;
+  variants?: ProductVariant[];
 }
 
 interface InventoryModalProps {
@@ -43,7 +54,10 @@ export function InventoryModal({ open, onOpenChange, item, onSave, products, far
     quantity_reserved: 0,
     low_stock_threshold: 10,
     location: '',
-    notes: ''
+    notes: '',
+    unit_type: 'pieces',
+    price_per_unit: 0,
+    total_price: 0
   });
 
   useEffect(() => {
@@ -57,7 +71,10 @@ export function InventoryModal({ open, onOpenChange, item, onSave, products, far
         quantity_reserved: 0,
         low_stock_threshold: 10,
         location: '',
-        notes: ''
+        notes: '',
+        unit_type: 'pieces',
+        price_per_unit: 0,
+        total_price: 0
       });
     }
   }, [item, farmId]);
@@ -135,22 +152,24 @@ export function InventoryModal({ open, onOpenChange, item, onSave, products, far
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Product Selection */}
+          {/* Product Variant Selection */}
           <div className="space-y-2">
-            <Label htmlFor="variant_id">Product *</Label>
+            <Label htmlFor="variant_id">Product Variant *</Label>
             <Select 
               value={formData.variant_id} 
               onValueChange={(value) => setFormData({...formData, variant_id: value})}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a product" />
+                <SelectValue placeholder="Select a product variant" />
               </SelectTrigger>
               <SelectContent>
-                {products.map((product) => (
-                  <SelectItem key={product.id} value={product.id}>
-                    {product.title}
-                  </SelectItem>
-                ))}
+                {products.flatMap((product) => 
+                  product.variants?.map((variant) => (
+                    <SelectItem key={variant.id} value={variant.id}>
+                      {product.title} - {variant.title || variant.sku || 'Default'}
+                    </SelectItem>
+                  )) || []
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -180,6 +199,75 @@ export function InventoryModal({ open, onOpenChange, item, onSave, products, far
             />
           </div>
 
+          {/* Unit and Pricing */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="unit_type">Unit Type *</Label>
+              <Select 
+                value={formData.unit_type} 
+                onValueChange={(value) => {
+                  const newFormData = {...formData, unit_type: value};
+                  newFormData.total_price = newFormData.quantity_available * newFormData.price_per_unit;
+                  setFormData(newFormData);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pieces">Pieces</SelectItem>
+                  <SelectItem value="kg">Kilograms (kg)</SelectItem>
+                  <SelectItem value="lbs">Pounds (lbs)</SelectItem>
+                  <SelectItem value="liters">Liters</SelectItem>
+                  <SelectItem value="gallons">Gallons</SelectItem>
+                  <SelectItem value="boxes">Boxes</SelectItem>
+                  <SelectItem value="bunches">Bunches</SelectItem>
+                  <SelectItem value="bags">Bags</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="price_per_unit">Price per Unit (USD) *</Label>
+              <Input
+                id="price_per_unit"
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.price_per_unit}
+                onChange={(e) => {
+                  const pricePerUnit = parseFloat(e.target.value) || 0;
+                  setFormData({
+                    ...formData, 
+                    price_per_unit: pricePerUnit,
+                    total_price: formData.quantity_available * pricePerUnit
+                  });
+                }}
+                placeholder="0.00"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="total_price">Total Price (USD)</Label>
+              <Input
+                id="total_price"
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.total_price}
+                onChange={(e) => {
+                  const totalPrice = parseFloat(e.target.value) || 0;
+                  setFormData({
+                    ...formData, 
+                    total_price: totalPrice,
+                    price_per_unit: formData.quantity_available > 0 ? totalPrice / formData.quantity_available : 0
+                  });
+                }}
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
           {/* Quantities */}
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
@@ -189,7 +277,14 @@ export function InventoryModal({ open, onOpenChange, item, onSave, products, far
                 type="number"
                 min="0"
                 value={formData.quantity_available}
-                onChange={(e) => setFormData({...formData, quantity_available: parseInt(e.target.value) || 0})}
+                onChange={(e) => {
+                  const quantity = parseInt(e.target.value) || 0;
+                  setFormData({
+                    ...formData, 
+                    quantity_available: quantity,
+                    total_price: quantity * formData.price_per_unit
+                  });
+                }}
                 placeholder="0"
               />
             </div>
