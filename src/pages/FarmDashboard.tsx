@@ -553,10 +553,9 @@ const FarmDashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="products">Products</TabsTrigger>
-            <TabsTrigger value="inventory">Inventory</TabsTrigger>
           </TabsList>
           
           {/* Overview Tab */}
@@ -625,18 +624,24 @@ const FarmDashboard = () => {
           {/* Products Tab */}
           <TabsContent value="products">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>Products</CardTitle>
                   <CardDescription>Manage your farm products and listings</CardDescription>
                 </div>
-                <Button 
-                  onClick={() => setProductModalOpen(true)}
-                  disabled={currentPlan?.max_products !== 0 && stats.totalProducts >= (currentPlan?.max_products || 0)}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Product
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={() => navigate(`/farm/${farmId}/inventory`)}>
+                    <Package className="h-4 w-4 mr-2" />
+                    Full Inventory
+                  </Button>
+                  <Button 
+                    onClick={() => setProductModalOpen(true)}
+                    disabled={currentPlan?.max_products !== 0 && stats.totalProducts >= (currentPlan?.max_products || 0)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Product
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -698,71 +703,6 @@ const FarmDashboard = () => {
             </Card>
           </TabsContent>
 
-          {/* Inventory Tab */}
-          <TabsContent value="inventory">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Inventory Management</CardTitle>
-                  <CardDescription>Track your product inventory and stock levels</CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={() => navigate(`/farm/${farmId}/inventory`)}>
-                    <Package className="h-4 w-4 mr-2" />
-                    Full Inventory
-                  </Button>
-                  <Button onClick={() => setInventoryModalOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Inventory
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Available</TableHead>
-                      <TableHead>Reserved</TableHead>
-                      <TableHead>Low Stock Alert</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {inventory.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.location || 'Main Storage'}</TableCell>
-                        <TableCell>{item.quantity_available}</TableCell>
-                        <TableCell>{item.quantity_reserved}</TableCell>
-                        <TableCell>{item.low_stock_threshold}</TableCell>
-                        <TableCell>
-                          <Badge variant={item.quantity_available <= item.low_stock_threshold ? 'destructive' : 'default'}>
-                            {item.quantity_available <= item.low_stock_threshold ? 'Low Stock' : 'In Stock'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="destructive" size="sm">
-                              <Trash className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {inventory.length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">No inventory items found.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
 
         {/* Product Modal */}
