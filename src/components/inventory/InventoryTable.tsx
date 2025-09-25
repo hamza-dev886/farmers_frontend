@@ -5,25 +5,21 @@ import { Edit, Trash2, Plus, Minus } from "lucide-react";
 
 interface InventoryItem {
   id: string;
+  product_id: string;
   title: string;
   sku?: string;
-  product_id: string;
-  manage_inventory: boolean;
-  allow_backorder: boolean;
+  price: number;
+  compare_at_price?: number;
+  weight?: number;
+  inventory_quantity: number;
+  track_inventory: boolean;
+  allow_backorders: boolean;
+  options?: any;
   created_at: string;
   updated_at: string;
   product?: {
     title: string;
     handle: string;
-  };
-  inventory_levels?: {
-    stocked_quantity: number;
-    reserved_quantity: number;
-    location_id: string;
-  }[];
-  price_set?: {
-    amount: number;
-    currency_code: string;
   };
 }
 
@@ -53,9 +49,9 @@ export const InventoryTable = ({ items, onEdit, onDelete, onAdjustStock, loading
           <TableRow>
             <TableHead>Product</TableHead>
             <TableHead>SKU</TableHead>
-            <TableHead>Stock</TableHead>
-            <TableHead>Reserved</TableHead>
             <TableHead>Price</TableHead>
+            <TableHead>Stock</TableHead>
+            <TableHead>Weight</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -80,9 +76,19 @@ export const InventoryTable = ({ items, onEdit, onDelete, onAdjustStock, loading
                   <Badge variant="outline">{item.sku || 'N/A'}</Badge>
                 </TableCell>
                 <TableCell>
+                  <div className="flex flex-col">
+                    <span className="font-medium">${item.price}</span>
+                    {item.compare_at_price && (
+                      <span className="text-sm text-muted-foreground line-through">
+                        ${item.compare_at_price}
+                      </span>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
                   <div className="flex items-center space-x-2">
                     <span className="font-medium">
-                      {item.inventory_levels?.[0]?.stocked_quantity || 0}
+                      {item.inventory_quantity}
                     </span>
                     <div className="flex space-x-1">
                       <Button
@@ -105,14 +111,11 @@ export const InventoryTable = ({ items, onEdit, onDelete, onAdjustStock, loading
                   </div>
                 </TableCell>
                 <TableCell>
-                  {item.inventory_levels?.[0]?.reserved_quantity || 0}
+                  {item.weight ? `${item.weight} kg` : 'N/A'}
                 </TableCell>
                 <TableCell>
-                  ${item.price_set?.amount || 0} {item.price_set?.currency_code || 'USD'}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={item.manage_inventory ? "default" : "secondary"}>
-                    {item.manage_inventory ? "Managed" : "Unmanaged"}
+                  <Badge variant={item.track_inventory ? "default" : "secondary"}>
+                    {item.track_inventory ? "Tracked" : "Untracked"}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">

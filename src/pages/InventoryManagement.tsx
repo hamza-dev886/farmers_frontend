@@ -1,49 +1,34 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { Header } from "@/components/Header";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { InventoryOverview } from "@/components/inventory/InventoryOverview";
-import { InventoryTable } from "@/components/inventory/InventoryTable";
-import { InventoryModal } from "@/components/inventory/InventoryModal";
-import { InventoryAdjustmentModal } from "@/components/inventory/InventoryAdjustmentModal";
-import { InventoryMovements } from "@/components/inventory/InventoryMovements";
-import { ArrowLeft, Plus, Package, Activity, TrendingUp, AlertTriangle } from "lucide-react";
-import type { User } from "@supabase/supabase-js";
+import { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Search, Package, AlertTriangle, TrendingDown } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { InventoryTable } from '@/components/inventory/InventoryTable';
+import { InventoryModal } from '@/components/inventory/InventoryModal';
 
 interface InventoryItem {
   id: string;
+  product_id: string;
   title: string;
   sku?: string;
-  product_id: string;
-  manage_inventory: boolean;
-  allow_backorder: boolean;
+  price: number;
+  compare_at_price?: number;
+  weight?: number;
+  inventory_quantity: number;
+  track_inventory: boolean;
+  allow_backorders: boolean;
+  options?: any;
   created_at: string;
   updated_at: string;
   product?: {
     title: string;
     handle: string;
   };
-  inventory_levels?: {
-    stocked_quantity: number;
-    reserved_quantity: number;
-    location_id: string;
-  }[];
-  price_set?: {
-    amount: number;
-    currency_code: string;
-  };
-}
-
-interface ProductVariant {
-  id: string;
-  title: string;
-  sku?: string;
-  product_id: string;
-  product_title?: string;
 }
 
 interface Product {
@@ -51,126 +36,59 @@ interface Product {
   title: string;
   handle: string;
   status: string;
-  variants?: ProductVariant[];
 }
 
-interface FarmData {
-  id: string;
-  name: string;
-  farmer_id: string;
-}
-
-const InventoryManagement = () => {
+export default function InventoryManagement() {
   const { farmId } = useParams<{ farmId: string }>();
-  const navigate = useNavigate();
   const { toast } = useToast();
   
-  const [user, setUser] = useState<User | null>(null);
-  const [farmData, setFarmData] = useState<FarmData | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Modal states
-  const [inventoryModalOpen, setInventoryModalOpen] = useState(false);
-  const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  
-  // Selected items
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'low' | 'out'>('all');
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
-  const [adjustingItem, setAdjustingItem] = useState<InventoryItem | null>(null);
-  const [deletingItem, setDeletingItem] = useState<InventoryItem | null>(null);
 
-  useEffect(() => {
-    checkUserAuth();
-  }, [farmId]);
-
-  const checkUserAuth = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate('/');
-        return;
-      }
-
-      setUser(session.user);
-
-      // Check if user has access to this farm
-      const { data: userProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single();
-
-      if (profileError) {
-        console.error('Error fetching user profile:', profileError);
-        navigate('/');
-        return;
-      }
-
-      if (userProfile.role !== 'farmer' && userProfile.role !== 'admin') {
-        toast({
-          title: "Access Denied",
-          description: "You don't have permission to access inventory management.",
-          variant: "destructive"
-        });
-        navigate('/');
-        return;
-      }
-
-      await Promise.all([
-        fetchFarmData(),
-        fetchInventory(),
-        fetchProducts()
-      ]);
-
-    } catch (error) {
-      console.error('Error checking auth:', error);
-      navigate('/');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchFarmData = async () => {
+  const fetchProducts = useCallback(async () => {
     if (!farmId) return;
-
+    
     try {
       const { data, error } = await supabase
-        .from('farms')
-        .select('*')
-        .eq('id', farmId)
-        .single();
+        .from('product')
+        .select(`
+          id,
+          title,
+          handle,
+          status,
+          farm_products!inner(
+            farm_id
+          )
+        `)
+        .eq('farm_products.farm_id', farmId);
 
       if (error) throw error;
-      setFarmData(data);
+      setProducts(data || []);
     } catch (error) {
-      console.error('Error fetching farm data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load farm data.",
-        variant: "destructive"
-      });
+      console.error('Error fetching products:', error);
     }
-  };
+  }, [farmId]);
 
-  const fetchInventory = async () => {
+  const fetchInventory = useCallback(async () => {
     if (!farmId) return;
-
+    
+    setLoading(true);
     try {
-      // Get product variants for this farm with inventory levels and pricing
       const { data, error } = await supabase
-        .from('product_variant')
+        .from('product_variants')
         .select(`
           *,
-          product:product_id(title, handle),
-          inventory_level:inventory_level!product_variant_inventory_item_id_fkey(
-            stocked_quantity,
-            reserved_quantity,
-            location_id
-          ),
-          product_variant_price_set!inner(
-            id
+          product!inner(
+            title,
+            handle,
+            farm_products!inner(
+              farm_id
+            )
           )
         `)
         .eq('product.farm_products.farm_id', farmId);
@@ -184,61 +102,63 @@ const InventoryManagement = () => {
         description: "Failed to load inventory data.",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
+  }, [farmId, toast]);
+
+  useEffect(() => {
+    if (farmId) {
+      fetchProducts();
+      fetchInventory();
+    }
+  }, [farmId, fetchProducts, fetchInventory]);
+
+  const handleAddItem = () => {
+    setEditingItem(null);
+    setIsModalOpen(true);
   };
 
-  const fetchProducts = async () => {
-    if (!farmId) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('farm_products')
-        .select(`
-          product_id,
-          product:product_id(id, title, handle, status)
-        `)
-        .eq('farm_id', farmId);
-
-      if (error) throw error;
-      
-      const productList = data?.map(fp => fp.product).filter(Boolean) || [];
-      setProducts(productList as Product[]);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load products.",
-        variant: "destructive"
-      });
-    }
+  const handleEditItem = (item: InventoryItem) => {
+    setEditingItem(item);
+    setIsModalOpen(true);
   };
 
-  const handleSaveInventory = async (inventoryData: InventoryItem) => {
+  const handleSaveItem = async (itemData: InventoryItem) => {
     try {
       if (editingItem) {
+        // Update existing item
         const { error } = await supabase
-          .from('product_variant')
+          .from('product_variants')
           .update({
-            title: inventoryData.title,
-            sku: inventoryData.sku,
-            manage_inventory: inventoryData.manage_inventory,
-            allow_backorder: inventoryData.allow_backorder
+            title: itemData.title,
+            sku: itemData.sku,
+            price: itemData.price,
+            compare_at_price: itemData.compare_at_price,
+            weight: itemData.weight,
+            inventory_quantity: itemData.inventory_quantity,
+            track_inventory: itemData.track_inventory,
+            allow_backorders: itemData.allow_backorders,
+            options: itemData.options || {}
           })
           .eq('id', editingItem.id);
 
         if (error) throw error;
       } else {
-        // Create new variant
-        const variantId = crypto.randomUUID();
+        // Create new item
         const { error } = await supabase
-          .from('product_variant')
+          .from('product_variants')
           .insert({
-            id: variantId,
-            title: inventoryData.title,
-            sku: inventoryData.sku,
-            product_id: inventoryData.product_id,
-            manage_inventory: inventoryData.manage_inventory,
-            allow_backorder: inventoryData.allow_backorder
+            product_id: itemData.product_id,
+            title: itemData.title,
+            sku: itemData.sku,
+            price: itemData.price,
+            compare_at_price: itemData.compare_at_price,
+            weight: itemData.weight,
+            inventory_quantity: itemData.inventory_quantity,
+            track_inventory: itemData.track_inventory,
+            allow_backorders: itemData.allow_backorders,
+            options: itemData.options || {}
           });
 
         if (error) throw error;
@@ -247,32 +167,24 @@ const InventoryManagement = () => {
       await fetchInventory();
       setEditingItem(null);
     } catch (error) {
-      console.error('Error saving inventory:', error);
+      console.error('Error saving inventory item:', error);
       throw error;
     }
   };
 
-  const handleDeleteInventory = async () => {
-    if (!deletingItem) return;
-
+  const handleDeleteItem = async (item: InventoryItem) => {
     try {
-      const { error } = await supabase
-        .from('product_variant')
-        .delete()
-        .eq('id', deletingItem.id);
-
+      const { error } = await supabase.from('product_variants').delete().eq('id', item.id);
+      
       if (error) throw error;
-
+      
       await fetchInventory();
-      setDeletingItem(null);
-      setDeleteDialogOpen(false);
-
       toast({
-        title: "Success",
-        description: "Inventory item deleted successfully."
+        title: "Item Deleted",
+        description: "Inventory item has been deleted successfully."
       });
     } catch (error) {
-      console.error('Error deleting inventory:', error);
+      console.error('Error deleting inventory item:', error);
       toast({
         title: "Error",
         description: "Failed to delete inventory item.",
@@ -281,13 +193,29 @@ const InventoryManagement = () => {
     }
   };
 
-  const handleQuickAdjustment = async (itemId: string, adjustment: number, type: 'add' | 'remove') => {
+  const handleAdjustStock = async (itemId: string, adjustmentAmount: number, type: 'add' | 'remove') => {
     try {
-      // This would need to update inventory_level table
+      const item = inventory.find(i => i.id === itemId);
+      if (!item) return;
+
+      const newQuantity = type === 'add' 
+        ? item.inventory_quantity + adjustmentAmount
+        : Math.max(0, item.inventory_quantity - adjustmentAmount);
+
+      const { error } = await supabase
+        .from('product_variants')
+        .update({ 
+          inventory_quantity: newQuantity
+        })
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      await fetchInventory();
+      
       toast({
-        title: "Info",
-        description: "Inventory adjustments need to be implemented with proper inventory levels.",
-        variant: "default"
+        title: "Stock Updated",
+        description: `Inventory adjusted by ${type === 'add' ? '+' : '-'}${adjustmentAmount}`,
       });
     } catch (error) {
       console.error('Error adjusting stock:', error);
@@ -299,209 +227,126 @@ const InventoryManagement = () => {
     }
   };
 
-  const handleDetailedAdjustment = async (itemId: string, quantity: number, type: string, reason: string) => {
-    try {
-      // This would need to update inventory_level table
-      setAdjustingItem(null);
-      toast({
-        title: "Info",
-        description: "Inventory adjustments need to be implemented with proper inventory levels.",
-        variant: "default"
-      });
-    } catch (error) {
-      console.error('Error making detailed adjustment:', error);
-      throw error;
-    }
-  };
+  const totalItems = inventory.length;
+  const lowStockItems = inventory.filter(item => item.inventory_quantity < 10).length;
+  const outOfStockItems = inventory.filter(item => item.inventory_quantity === 0).length;
 
-  const getInventoryStats = () => {
-    const totalItems = inventory.length;
-    const lowStockItems = inventory.filter(item => 
-      item.inventory_levels?.[0]?.stocked_quantity && item.inventory_levels[0].stocked_quantity <= 10
-    ).length;
-    const totalValue = inventory.reduce((sum, item) => 
-      sum + (item.inventory_levels?.[0]?.stocked_quantity || 0) * (item.price_set?.amount || 0), 0
-    );
-    const lastUpdated = inventory.length > 0 
-      ? inventory.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0].updated_at
-      : new Date().toISOString();
+  const filteredInventory = inventory.filter(item => {
+    const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.product?.title.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesFilter = filterStatus === 'all' || 
+                         (filterStatus === 'low' && item.inventory_quantity < 10) ||
+                         (filterStatus === 'out' && item.inventory_quantity === 0);
+    
+    return matchesSearch && matchesFilter;
+  });
 
-    return {
-      totalItems,
-      lowStockItems,
-      totalValue,
-      lastUpdated
-    };
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <div className="container mx-auto px-4 py-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-muted rounded w-64"></div>
-            <div className="h-64 bg-muted rounded"></div>
-          </div>
-        </div>
-      </div>
-    );
+  if (!farmId) {
+    return <div>Farm not found</div>;
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate(`/farm/${farmId}`)}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Farm Dashboard
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Inventory Management</h1>
-              <p className="text-muted-foreground">
-                Manage inventory for {farmData?.name}
-              </p>
-            </div>
-          </div>
-          <Button onClick={() => setInventoryModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Inventory Item
-          </Button>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Inventory Management</h1>
+          <p className="text-muted-foreground">
+            Manage your product variants and track inventory levels
+          </p>
         </div>
-
-        {/* Tabs */}
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="overview">
-              <Package className="h-4 w-4 mr-2" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="inventory">
-              <TrendingUp className="h-4 w-4 mr-2" />
-              Inventory
-            </TabsTrigger>
-            <TabsTrigger value="movements">
-              <Activity className="h-4 w-4 mr-2" />
-              Movements
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview">
-            <div className="space-y-6">
-              <InventoryOverview stats={getInventoryStats()} />
-              
-              {/* Quick Actions */}
-              <div className="grid gap-4 md:grid-cols-3">
-                <Button 
-                  variant="outline" 
-                  className="h-20 flex-col"
-                  onClick={() => setInventoryModalOpen(true)}
-                >
-                  <Plus className="h-6 w-6 mb-2" />
-                  Add New Item
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="h-20 flex-col"
-                  onClick={() => {
-                    const lowStockItem = inventory.find(item => 
-                      item.inventory_levels?.[0]?.stocked_quantity && item.inventory_levels[0].stocked_quantity <= 10
-                    );
-                    if (lowStockItem) {
-                      setAdjustingItem(lowStockItem);
-                      setAdjustmentModalOpen(true);
-                    }
-                  }}
-                  disabled={getInventoryStats().lowStockItems === 0}
-                >
-                  <AlertTriangle className="h-6 w-6 mb-2" />
-                  Restock Low Items
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="h-20 flex-col"
-                  onClick={() => {
-                    toast({
-                      title: "Export Started",
-                      description: "Your inventory report is being generated."
-                    });
-                  }}
-                >
-                  <Package className="h-6 w-6 mb-2" />
-                  Export Report
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="inventory">
-            <InventoryTable
-              items={inventory}
-              onEdit={(item) => {
-                setEditingItem(item);
-                setInventoryModalOpen(true);
-              }}
-              onDelete={(item) => {
-                setDeletingItem(item);
-                setDeleteDialogOpen(true);
-              }}
-              onAdjustStock={handleQuickAdjustment}
-              loading={loading}
-            />
-          </TabsContent>
-
-          <TabsContent value="movements">
-            <InventoryMovements farmId={farmId || ''} />
-          </TabsContent>
-        </Tabs>
-
-        {/* Modals */}
-        <InventoryModal
-          open={inventoryModalOpen}
-          onOpenChange={(open) => {
-            setInventoryModalOpen(open);
-            if (!open) setEditingItem(null);
-          }}
-          item={editingItem}
-          onSave={handleSaveInventory}
-          products={products}
-          farmId={farmId || ''}
-        />
-
-        <InventoryAdjustmentModal
-          open={adjustmentModalOpen}
-          onOpenChange={(open) => {
-            setAdjustmentModalOpen(open);
-            if (!open) setAdjustingItem(null);
-          }}
-          itemId={adjustingItem?.id}
-          currentQuantity={adjustingItem?.inventory_levels?.[0]?.stocked_quantity}
-          itemName={adjustingItem?.title || `Item ${adjustingItem?.id?.slice(0, 8)}`}
-          onAdjust={handleDetailedAdjustment}
-        />
-
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Inventory Item</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete this inventory item? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteInventory}>
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <Button onClick={handleAddItem} className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Add Product Variant
+        </Button>
       </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalItems}</div>
+            <p className="text-xs text-muted-foreground">Product variants in inventory</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Low Stock</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-500">{lowStockItems}</div>
+            <p className="text-xs text-muted-foreground">Items with less than 10 units</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Out of Stock</CardTitle>
+            <TrendingDown className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-500">{outOfStockItems}</div>
+            <p className="text-xs text-muted-foreground">Items with 0 units</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Inventory Items</CardTitle>
+          <CardDescription>
+            View and manage all your product variants
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search by name, SKU, or product..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={filterStatus} onValueChange={(value: 'all' | 'low' | 'out') => setFilterStatus(value)}>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Items</SelectItem>
+                <SelectItem value="low">Low Stock</SelectItem>
+                <SelectItem value="out">Out of Stock</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <InventoryTable
+            items={filteredInventory}
+            onEdit={handleEditItem}
+            onDelete={handleDeleteItem}
+            onAdjustStock={handleAdjustStock}
+            loading={loading}
+          />
+        </CardContent>
+      </Card>
+
+      <InventoryModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        item={editingItem}
+        onSave={handleSaveItem}
+        products={products}
+        farmId={farmId}
+      />
     </div>
   );
-};
-
-export default InventoryManagement;
+}

@@ -9,37 +9,21 @@ import { useToast } from "@/hooks/use-toast";
 
 interface InventoryItem {
   id: string;
+  product_id: string;
   title: string;
   sku?: string;
-  barcode?: string;
-  ean?: string;
-  upc?: string;
-  product_id: string;
-  manage_inventory: boolean;
-  allow_backorder: boolean;
-  hs_code?: string;
-  origin_country?: string;
-  mid_code?: string;
-  material?: string;
+  price: number;
+  compare_at_price?: number;
   weight?: number;
-  length?: number;
-  height?: number;
-  width?: number;
-  variant_rank?: number;
+  inventory_quantity: number;
+  track_inventory: boolean;
+  allow_backorders: boolean;
+  options?: any;
   created_at: string;
   updated_at: string;
   product?: {
     title: string;
     handle: string;
-  };
-  inventory_levels?: {
-    stocked_quantity: number;
-    reserved_quantity: number;
-    location_id: string;
-  }[];
-  price_set?: {
-    amount: number;
-    currency_code: string;
   };
 }
 
@@ -71,27 +55,20 @@ export const InventoryModal = ({ open, onOpenChange, item, onSave, products, far
       setFormData({
         title: '',
         sku: '',
-        barcode: '',
-        ean: '',
-        upc: '',
         product_id: '',
-        manage_inventory: true,
-        allow_backorder: false,
-        hs_code: '',
-        origin_country: '',
-        mid_code: '',
-        material: '',
+        price: 0,
+        compare_at_price: undefined,
         weight: undefined,
-        length: undefined,
-        height: undefined,
-        width: undefined,
-        variant_rank: 0
+        inventory_quantity: 0,
+        track_inventory: true,
+        allow_backorders: false,
+        options: {}
       });
     }
   }, [item]);
 
   const handleSave = async () => {
-    if (!formData.title || !formData.product_id) {
+    if (!formData.title || !formData.product_id || formData.price == null) {
       toast({
         title: "Error",
         description: "Please fill in all required fields.",
@@ -169,148 +146,75 @@ export const InventoryModal = ({ open, onOpenChange, item, onSave, products, far
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <div className="grid gap-2">
-              <Label htmlFor="barcode">Barcode</Label>
+              <Label htmlFor="price">Price *</Label>
               <Input
-                id="barcode"
-                value={formData.barcode || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, barcode: e.target.value }))}
-                placeholder="123456789"
+                id="price"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.price || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                placeholder="0.00"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="ean">EAN</Label>
+              <Label htmlFor="compare_at_price">Compare at Price</Label>
               <Input
-                id="ean"
-                value={formData.ean || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, ean: e.target.value }))}
-                placeholder="EAN code"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="upc">UPC</Label>
-              <Input
-                id="upc"
-                value={formData.upc || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, upc: e.target.value }))}
-                placeholder="UPC code"
+                id="compare_at_price"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.compare_at_price || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, compare_at_price: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                placeholder="0.00"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div className="grid gap-2">
-              <Label htmlFor="material">Material</Label>
-              <Input
-                id="material"
-                value={formData.material || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, material: e.target.value }))}
-                placeholder="e.g., Cotton, Wood"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="origin_country">Origin Country</Label>
-              <Input
-                id="origin_country"
-                value={formData.origin_country || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, origin_country: e.target.value }))}
-                placeholder="e.g., USA, China"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-4 gap-2">
-            <div className="grid gap-2">
-              <Label htmlFor="weight">Weight (g)</Label>
+              <Label htmlFor="weight">Weight (kg)</Label>
               <Input
                 id="weight"
                 type="number"
+                step="0.001"
+                min="0"
                 value={formData.weight || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, weight: e.target.value ? parseInt(e.target.value) : undefined }))}
-                placeholder="500"
+                onChange={(e) => setFormData(prev => ({ ...prev, weight: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                placeholder="0.500"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="length">Length (cm)</Label>
+              <Label htmlFor="inventory_quantity">Inventory Quantity *</Label>
               <Input
-                id="length"
+                id="inventory_quantity"
                 type="number"
-                value={formData.length || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, length: e.target.value ? parseInt(e.target.value) : undefined }))}
-                placeholder="10"
+                min="0"
+                value={formData.inventory_quantity || 0}
+                onChange={(e) => setFormData(prev => ({ ...prev, inventory_quantity: parseInt(e.target.value) || 0 }))}
+                placeholder="0"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="height">Height (cm)</Label>
-              <Input
-                id="height"
-                type="number"
-                value={formData.height || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, height: e.target.value ? parseInt(e.target.value) : undefined }))}
-                placeholder="5"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="width">Width (cm)</Label>
-              <Input
-                id="width"
-                type="number"
-                value={formData.width || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, width: e.target.value ? parseInt(e.target.value) : undefined }))}
-                placeholder="15"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div className="grid gap-2">
-              <Label htmlFor="hs_code">HS Code</Label>
-              <Input
-                id="hs_code"
-                value={formData.hs_code || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, hs_code: e.target.value }))}
-                placeholder="e.g., 1234.56.78"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="mid_code">MID Code</Label>
-              <Input
-                id="mid_code"
-                value={formData.mid_code || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, mid_code: e.target.value }))}
-                placeholder="MID code"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="variant_rank">Variant Rank</Label>
-            <Input
-              id="variant_rank"
-              type="number"
-              value={formData.variant_rank || 0}
-              onChange={(e) => setFormData(prev => ({ ...prev, variant_rank: parseInt(e.target.value) || 0 }))}
-              placeholder="0"
-            />
           </div>
 
           <div className="flex items-center space-x-2">
             <Switch
-              id="manage_inventory"
-              checked={formData.manage_inventory || false}
-              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, manage_inventory: checked }))}
+              id="track_inventory"
+              checked={formData.track_inventory || false}
+              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, track_inventory: checked }))}
             />
-            <Label htmlFor="manage_inventory">Manage inventory</Label>
+            <Label htmlFor="track_inventory">Track inventory</Label>
           </div>
 
           <div className="flex items-center space-x-2">
             <Switch
-              id="allow_backorder"
-              checked={formData.allow_backorder || false}
-              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, allow_backorder: checked }))}
+              id="allow_backorders"
+              checked={formData.allow_backorders || false}
+              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, allow_backorders: checked }))}
             />
-            <Label htmlFor="allow_backorder">Allow backorders</Label>
+            <Label htmlFor="allow_backorders">Allow backorders</Label>
           </div>
         </div>
 
