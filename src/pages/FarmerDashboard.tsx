@@ -73,6 +73,8 @@ interface CurrentPlan {
   assigned_at: string;
   max_products: number;
   transaction_fee: number;
+  can_create_multiple_stand: boolean;
+  allowed_to_business_in_multiple_location: boolean;
 }
 
 interface DashboardStats {
@@ -85,7 +87,8 @@ interface DashboardStats {
 const FarmerDashboard = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isFarmer, setIsFarmer] = useState(false);
-  const [farmData, setFarmData] = useState<FarmData | null>(null);
+  const [farmData, setFarmData] = useState<FarmData[]>([]);
+  const [selectedFarm, setSelectedFarm] = useState<FarmData | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [inventory, setInventory] = useState<Inventory[]>([]);
   const [currentPlan, setCurrentPlan] = useState<CurrentPlan | null>(null);
@@ -98,9 +101,11 @@ const FarmerDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const [farmModalOpen, setFarmModalOpen] = useState(false);
+  const [addFarmModalOpen, setAddFarmModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [inventoryModalOpen, setInventoryModalOpen] = useState(false);
   const [farmFormData, setFarmFormData] = useState<Partial<FarmData>>({});
+  const [newFarmFormData, setNewFarmFormData] = useState<Partial<FarmData>>({});
   const [productFormData, setProductFormData] = useState<Partial<Product>>({});
   const [inventoryFormData, setInventoryFormData] = useState<Partial<Inventory>>({});
   const [editingItem, setEditingItem] = useState<string | null>(null);
@@ -162,17 +167,20 @@ const FarmerDashboard = () => {
         .from('farms')
         .select('*')
         .eq('farmer_id', userId)
-        .single();
+        .order('created_at', { ascending: false });
 
-      if (error && error.code !== 'PGRST116') throw error;
-      setFarmData(data);
+      if (error) throw error;
+      setFarmData(data || []);
+      if (data && data.length > 0 && !selectedFarm) {
+        setSelectedFarm(data[0]);
+      }
     } catch (error) {
       console.error('Error fetching farm data:', error);
     }
   };
 
   const fetchProducts = async () => {
-    if (!user || !farmData) return;
+    if (!user || !selectedFarm) return;
 
     try {
       const { data, error } = await supabase
@@ -189,7 +197,7 @@ const FarmerDashboard = () => {
             updated_at
           )
         `)
-        .eq('farm_id', farmData.id);
+        .eq('farm_id', selectedFarm.id);
 
       if (error) throw error;
 
@@ -220,13 +228,13 @@ const FarmerDashboard = () => {
   };
 
   const fetchInventory = async () => {
-    if (!user || !farmData) return;
+    if (!user || !selectedFarm) return;
 
     try {
       const { data, error } = await supabase
         .from('inventory_tracking')
         .select('*')
-        .eq('farm_id', farmData.id);
+        .eq('farm_id', selectedFarm.id);
 
       if (error) throw error;
 
@@ -260,7 +268,9 @@ const FarmerDashboard = () => {
             price,
             billing_cycle,
             max_number_of_product,
-            transaction_fee
+            transaction_fee,
+            can_create_multiple_stand,
+            allowed_to_business_in_multiple_location
           )
         `)
         .eq('user_id', userId)
@@ -276,7 +286,9 @@ const FarmerDashboard = () => {
           billing_cycle: data.pricing_plans?.billing_cycle || 'N/A',
           assigned_at: data.assigned_at,
           max_products: data.pricing_plans?.max_number_of_product || 0,
-          transaction_fee: data.pricing_plans?.transaction_fee || 0
+          transaction_fee: data.pricing_plans?.transaction_fee || 0,
+          can_create_multiple_stand: data.pricing_plans?.can_create_multiple_stand || false,
+          allowed_to_business_in_multiple_location: data.pricing_plans?.allowed_to_business_in_multiple_location || false
         });
       }
     } catch (error) {
@@ -285,13 +297,13 @@ const FarmerDashboard = () => {
   };
 
   const handleUpdateFarm = async () => {
-    if (!user || !farmData) return;
+    if (!user || !selectedFarm) return;
 
     try {
       const { error } = await supabase
         .from('farms')
         .update(farmFormData)
-        .eq('id', farmData.id);
+        .eq('id', selectedFarm.id);
 
       if (error) throw error;
 
@@ -312,11 +324,58 @@ const FarmerDashboard = () => {
     }
   };
 
+  const handleAddNewFarm = async () => {
+    if (!user || !newFarmFormData.name || !newFarmFormData.address || !newFarmFormData.contact_person || !newFarmFormData.email) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please fill in all required fields."
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('farms')
+        .insert({
+          name: newFarmFormData.name,
+          address: newFarmFormData.address,
+          contact_person: newFarmFormData.contact_person,
+          email: newFarmFormData.email,
+          phone: newFarmFormData.phone || null,
+          bio: newFarmFormData.bio || null,
+          farmer_id: user.id
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "New farm added successfully."
+      });
+
+      setAddFarmModalOpen(false);
+      setNewFarmFormData({});
+      await fetchFarmData();
+    } catch (error) {
+      console.error('Error adding farm:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to add new farm."
+      });
+    }
+  };
+
   const handleEditFarm = () => {
-    if (farmData) {
-      setFarmFormData(farmData);
+    if (selectedFarm) {
+      setFarmFormData(selectedFarm);
       setFarmModalOpen(true);
     }
+  };
+
+  const canAddMultipleFarms = () => {
+    return currentPlan?.can_create_multiple_stand || currentPlan?.allowed_to_business_in_multiple_location;
   };
 
   if (loading) {
@@ -346,7 +405,7 @@ const FarmerDashboard = () => {
             Farmer Dashboard
           </h1>
           <p className="text-muted-foreground">
-            Welcome back, {farmData?.contact_person || 'Farmer'}! Manage your farm and products.
+            Welcome back, {selectedFarm?.contact_person || 'Farmer'}! Manage your farm and products.
           </p>
         </div>
 
@@ -421,27 +480,27 @@ const FarmerDashboard = () => {
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  {farmData ? (
+                  {selectedFarm ? (
                     <div className="space-y-3">
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Farm Name</p>
-                        <p className="text-lg">{farmData.name}</p>
+                        <p className="text-lg">{selectedFarm.name}</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Address</p>
-                        <p>{farmData.address}</p>
+                        <p>{selectedFarm.address}</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Contact Person</p>
-                        <p>{farmData.contact_person}</p>
+                        <p>{selectedFarm.contact_person}</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Email</p>
-                        <p>{farmData.email}</p>
+                        <p>{selectedFarm.email}</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Phone</p>
-                        <p>{farmData.phone || 'Not provided'}</p>
+                        <p>{selectedFarm.phone || 'Not provided'}</p>
                       </div>
                     </div>
                   ) : (
@@ -457,32 +516,36 @@ const FarmerDashboard = () => {
                   <CardDescription>Your active pricing plan and features</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {currentPlan ? (
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Plan Name</p>
-                        <p className="text-lg font-semibold">{currentPlan.plan_name}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Price</p>
-                        <p>{currentPlan.price} / {currentPlan.billing_cycle}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Max Products</p>
-                        <p>{currentPlan.max_products} products</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Transaction Fee</p>
-                        <p>{currentPlan.transaction_fee}%</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Assigned On</p>
-                        <p>{new Date(currentPlan.assigned_at).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground">No active subscription plan.</p>
-                  )}
+                      {selectedFarm ? (
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Plan Name</p>
+                            <p className="text-lg font-semibold">{currentPlan.plan_name}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Price</p>
+                            <p>{currentPlan.price} / {currentPlan.billing_cycle}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Max Products</p>
+                            <p>{currentPlan.max_products} products</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Transaction Fee</p>
+                            <p>{currentPlan.transaction_fee}%</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Assigned On</p>
+                            <p>{new Date(currentPlan.assigned_at).toLocaleDateString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Multiple Farms</p>
+                            <p>{canAddMultipleFarms() ? 'Allowed' : 'Not Available'}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-muted-foreground">No active subscription plan.</p>
+                      )}
                 </CardContent>
               </Card>
             </div>
@@ -490,91 +553,146 @@ const FarmerDashboard = () => {
 
           {/* Farm Tab */}
           <TabsContent value="farm">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>My Farm</CardTitle>
-                  <CardDescription>Complete farm information and management</CardDescription>
-                </div>
-                <Button onClick={handleEditFarm} disabled={!farmData}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Farm
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {farmData ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="text-lg font-semibold mb-2">Basic Information</h3>
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Farm Name</p>
-                            <p className="text-lg">{farmData.name}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Contact Person</p>
-                            <p>{farmData.contact_person}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Email</p>
-                            <p>{farmData.email}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Phone</p>
-                            <p>{farmData.phone || 'Not provided'}</p>
-                          </div>
-                        </div>
-                      </div>
+            <div className="space-y-6">
+              {/* Farm Selector & Add Farm */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>My Farms</CardTitle>
+                    <CardDescription>Manage your farm locations and information</CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    {canAddMultipleFarms() && (
+                      <Button onClick={() => setAddFarmModalOpen(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Farm
+                      </Button>
+                    )}
+                    <Button onClick={handleEditFarm} disabled={!selectedFarm} variant="outline">
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Farm
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {farmData.length > 1 && (
+                    <div className="mb-6">
+                      <Label htmlFor="farm-selector">Select Farm</Label>
+                      <Select 
+                        value={selectedFarm?.id || ''} 
+                        onValueChange={(value) => {
+                          const farm = farmData.find(f => f.id === value);
+                          setSelectedFarm(farm || null);
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a farm" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {farmData.map((farm) => (
+                            <SelectItem key={farm.id} value={farm.id}>
+                              {farm.name} - {farm.address}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="text-lg font-semibold mb-2">Location & Description</h3>
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Address</p>
-                            <p>{farmData.address}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Farm Bio</p>
-                            <p className="text-sm">{farmData.bio || 'No description available'}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Created</p>
-                            <p>{new Date(farmData.created_at).toLocaleDateString()}</p>
+                  )}
+                  {selectedFarm ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">Basic Information</h3>
+                          <div className="space-y-3">
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Farm Name</p>
+                              <p className="text-lg">{selectedFarm.name}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Contact Person</p>
+                              <p>{selectedFarm.contact_person}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Email</p>
+                              <p>{selectedFarm.email}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Phone</p>
+                              <p>{selectedFarm.phone || 'Not provided'}</p>
+                            </div>
                           </div>
                         </div>
                       </div>
                       
-                      <div>
-                        <h3 className="text-lg font-semibold mb-2">Plan Limits</h3>
-                        <div className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-sm">Products Used:</span>
-                            <span className="text-sm font-medium">
-                              {stats.totalProducts} / {currentPlan?.max_products === 0 ? '∞' : currentPlan?.max_products || 0}
-                            </span>
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">Location & Description</h3>
+                          <div className="space-y-3">
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Address</p>
+                              <p>{selectedFarm.address}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Farm Bio</p>
+                              <p className="text-sm">{selectedFarm.bio || 'No description available'}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Created</p>
+                              <p>{new Date(selectedFarm.created_at).toLocaleDateString()}</p>
+                            </div>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-sm">Transaction Fee:</span>
-                            <span className="text-sm font-medium">{currentPlan?.transaction_fee || 0}%</span>
+                        </div>
+                        
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2">Plan Limits</h3>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-sm">Products Used:</span>
+                              <span className="text-sm font-medium">
+                                {stats.totalProducts} / {currentPlan?.max_products === 0 ? '∞' : currentPlan?.max_products || 0}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm">Transaction Fee:</span>
+                              <span className="text-sm font-medium">{currentPlan?.transaction_fee || 0}%</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm">Multiple Farms:</span>
+                              <span className="text-sm font-medium">
+                                {canAddMultipleFarms() ? 'Allowed' : 'Not Available'}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Wheat className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No Farm Information</h3>
-                    <p className="text-muted-foreground mb-4">
-                      Your farm profile hasn't been set up yet. Contact support to complete your farm setup.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Wheat className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">No Farm Information</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Your farm profile hasn't been set up yet. Contact support to complete your farm setup.
+                      </p>
+                      {canAddMultipleFarms() && (
+                        <Button onClick={() => setAddFarmModalOpen(true)}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Your First Farm
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
+                  {!canAddMultipleFarms() && farmData.length === 0 && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                      <p className="text-sm text-blue-800">
+                        Your current plan allows only one farm location. 
+                        Upgrade to a Business or higher plan to manage multiple farms.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Products Tab */}
@@ -817,6 +935,94 @@ const FarmerDashboard = () => {
               </Button>
               <Button onClick={handleUpdateFarm}>
                 Update Farm
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add New Farm Modal */}
+        <Dialog open={addFarmModalOpen} onOpenChange={setAddFarmModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add New Farm</DialogTitle>
+              <DialogDescription>
+                Add a new farm location to your account. Multiple farms are available with your current plan.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-farm-name">Farm Name</Label>
+                <Input
+                  id="new-farm-name"
+                  value={newFarmFormData.name || ''}
+                  onChange={(e) => setNewFarmFormData({...newFarmFormData, name: e.target.value})}
+                  placeholder="Enter farm name"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="new-contact-person">Contact Person</Label>
+                <Input
+                  id="new-contact-person"
+                  value={newFarmFormData.contact_person || ''}
+                  onChange={(e) => setNewFarmFormData({...newFarmFormData, contact_person: e.target.value})}
+                  placeholder="Enter contact person name"
+                />
+              </div>
+              
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="new-address">Address</Label>
+                <Textarea
+                  id="new-address"
+                  value={newFarmFormData.address || ''}
+                  onChange={(e) => setNewFarmFormData({...newFarmFormData, address: e.target.value})}
+                  placeholder="Enter complete farm address"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="new-email">Email</Label>
+                <Input
+                  id="new-email"
+                  type="email"
+                  value={newFarmFormData.email || ''}
+                  onChange={(e) => setNewFarmFormData({...newFarmFormData, email: e.target.value})}
+                  placeholder="Enter email address"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="new-phone">Phone</Label>
+                <Input
+                  id="new-phone"
+                  value={newFarmFormData.phone || ''}
+                  onChange={(e) => setNewFarmFormData({...newFarmFormData, phone: e.target.value})}
+                  placeholder="Enter phone number"
+                />
+              </div>
+              
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="new-bio">Farm Bio</Label>
+                <Textarea
+                  id="new-bio"
+                  value={newFarmFormData.bio || ''}
+                  onChange={(e) => setNewFarmFormData({...newFarmFormData, bio: e.target.value})}
+                  rows={3}
+                  placeholder="Describe your farm and what you grow"
+                />
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setAddFarmModalOpen(false);
+                setNewFarmFormData({});
+              }}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddNewFarm}>
+                Add Farm
               </Button>
             </DialogFooter>
           </DialogContent>
