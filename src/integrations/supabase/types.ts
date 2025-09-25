@@ -1917,7 +1917,7 @@ export type Database = {
             foreignKeyName: "inventory_tracking_variant_id_fkey"
             columns: ["variant_id"]
             isOneToOne: false
-            referencedRelation: "product_variants"
+            referencedRelation: "product"
             referencedColumns: ["id"]
           },
         ]
