@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import FarmerProfile from "./pages/FarmerProfile";
 import FarmerDashboard from "./pages/FarmerDashboard";
 import FarmDashboard from "./pages/FarmDashboard";
+import InventoryManagement from "./pages/InventoryManagement";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/farmer/:farmId" element={<FarmerProfile />} />
             <Route path="/farmer-dashboard" element={<FarmerDashboard />} />
             <Route path="/farm/:farmId" element={<FarmDashboard />} />
+            <Route path="/farm/:farmId/inventory" element={<InventoryManagement />} />
             <Route path="/admin" element={<AdminDashboard />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

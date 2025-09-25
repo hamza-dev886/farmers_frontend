@@ -706,10 +706,16 @@ const FarmDashboard = () => {
                   <CardTitle>Inventory Management</CardTitle>
                   <CardDescription>Track your product inventory and stock levels</CardDescription>
                 </div>
-                <Button onClick={() => setInventoryModalOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Inventory
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={() => navigate(`/farm/${farmId}/inventory`)}>
+                    <Package className="h-4 w-4 mr-2" />
+                    Full Inventory
+                  </Button>
+                  <Button onClick={() => setInventoryModalOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Inventory
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
