@@ -1,11 +1,39 @@
-import { Search, MapPin } from "lucide-react";
+import { useState } from "react";
+import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MapboxAutocomplete } from "@/components/ui/mapbox-autocomplete";
+import { MapboxMapPreview } from "@/components/ui/mapbox-map-preview";
 import heroImage from "@/assets/farm-hero.jpg";
 
 export const Hero = () => {
+  const [address, setAddress] = useState("");
+  const [coordinates, setCoordinates] = useState<[number, number] | null>(null);
+  const [searchType, setSearchType] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [maxDistance, setMaxDistance] = useState("");
+
+  const handleSearch = () => {
+    if (!address || !searchType || !searchQuery || !maxDistance) {
+      alert("Please fill in all fields before searching");
+      return;
+    }
+    
+    console.log("Search params:", {
+      address,
+      coordinates,
+      searchType,
+      searchQuery,
+      maxDistance
+    });
+    
+    // TODO: Implement search logic
+    alert(`Searching for ${searchType}: "${searchQuery}" within ${maxDistance} miles of ${address}`);
+  };
+
   return (
-    <section className="relative min-h-[70vh] flex items-center justify-center overflow-hidden">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${heroImage})` }}
@@ -24,26 +52,84 @@ export const Hero = () => {
           local produce. Support family farms and discover farm events in your community.
         </p>
         
-        <div className="max-w-2xl mx-auto bg-card/90 backdrop-blur-sm rounded-xl p-6 shadow-farm border border-border/20">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-              <Input 
-                placeholder="Enter location (city, state, or zip)"
-                className="pl-10 h-12 border-farm-green/20 focus:border-farm-green"
-              />
+        <div className="max-w-4xl mx-auto bg-card/90 backdrop-blur-sm rounded-xl p-6 shadow-farm border border-border/20">
+          {/* Address Selection */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-4 text-foreground">Pin Your Location</h3>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <MapboxAutocomplete
+                  value={address}
+                  onChange={(newAddress, newCoordinates) => {
+                    setAddress(newAddress);
+                    setCoordinates(newCoordinates || null);
+                  }}
+                  placeholder="Enter your address to find nearby farms..."
+                  className="h-12 border-farm-green/20 focus:border-farm-green"
+                />
+              </div>
+              <div className="h-48 md:h-32">
+                <MapboxMapPreview coordinates={coordinates} className="h-full rounded-lg" />
+              </div>
             </div>
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-              <Input 
-                placeholder="Search farms, produce, or events"
-                className="pl-10 h-12 border-farm-green/20 focus:border-farm-green"
-              />
-            </div>
-            <Button variant="hero" size="hero" className="md:w-auto w-full">
-              Find Farms
-            </Button>
           </div>
+
+          {/* Search Filters */}
+          <div className="grid md:grid-cols-3 gap-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium mb-2 text-foreground">What are you looking for?</label>
+              <Select value={searchType} onValueChange={setSearchType}>
+                <SelectTrigger className="h-12 border-farm-green/20 focus:border-farm-green">
+                  <SelectValue placeholder="Select search type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="product">Product</SelectItem>
+                  <SelectItem value="farm">Farm</SelectItem>
+                  <SelectItem value="event">Event</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2 text-foreground">Search term</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+                <Input 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="e.g., tomatoes, Green Valley Farm, harvest festival"
+                  className="pl-10 h-12 border-farm-green/20 focus:border-farm-green"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2 text-foreground">Max distance</label>
+              <Select value={maxDistance} onValueChange={setMaxDistance}>
+                <SelectTrigger className="h-12 border-farm-green/20 focus:border-farm-green">
+                  <SelectValue placeholder="Select distance" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 mile</SelectItem>
+                  <SelectItem value="2">2 miles</SelectItem>
+                  <SelectItem value="3">3 miles</SelectItem>
+                  <SelectItem value="5">5 miles</SelectItem>
+                  <SelectItem value="10">10 miles</SelectItem>
+                  <SelectItem value="50">50 miles</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Search Button */}
+          <Button 
+            onClick={handleSearch}
+            variant="hero" 
+            size="hero" 
+            className="w-full md:w-auto px-12"
+          >
+            Search Now
+          </Button>
         </div>
         
         <div className="mt-8 flex flex-wrap justify-center gap-4 text-sm text-muted-foreground">
