@@ -52,15 +52,18 @@ export const Hero = () => {
           local produce. Support family farms and discover farm events in your community.
         </p>
         
-        <div className="max-w-5xl mx-auto bg-card/90 backdrop-blur-sm rounded-2xl p-8 shadow-farm border border-border/20">
-          {/* Step 1: Location */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-farm-green text-white rounded-full flex items-center justify-center text-sm font-semibold">1</div>
-              <h3 className="text-xl font-semibold text-foreground">Where are you located?</h3>
-            </div>
-            <div className="grid lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
+        <div className="max-w-6xl mx-auto bg-card/90 backdrop-blur-sm rounded-2xl p-8 shadow-farm border border-border/20">
+          {/* Two Column Layout */}
+          <div className="grid lg:grid-cols-2 gap-12 mb-8">
+            
+            {/* Left Column - Location */}
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-8 h-8 bg-farm-green text-white rounded-full flex items-center justify-center text-sm font-semibold">1</div>
+                <h3 className="text-xl font-semibold text-foreground">Where are you located?</h3>
+              </div>
+              
+              <div className="space-y-4">
                 <MapboxAutocomplete
                   value={address}
                   onChange={(newAddress, newCoordinates) => {
@@ -70,63 +73,66 @@ export const Hero = () => {
                   placeholder="Enter your address to find nearby farms..."
                   className="h-14 text-lg border-farm-green/20 focus:border-farm-green"
                 />
-              </div>
-              <div className="h-40 lg:h-24">
-                <MapboxMapPreview coordinates={coordinates} className="h-full rounded-lg border border-border/20" />
-              </div>
-            </div>
-          </div>
-
-          {/* Step 2: Search Preferences */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 bg-farm-green text-white rounded-full flex items-center justify-center text-sm font-semibold">2</div>
-              <h3 className="text-xl font-semibold text-foreground">What are you looking for?</h3>
-            </div>
-            
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="sm:col-span-2 lg:col-span-1">
-                <label className="block text-sm font-medium mb-3 text-foreground">I'm looking for</label>
-                <Select value={searchType} onValueChange={setSearchType}>
-                  <SelectTrigger className="h-14 border-farm-green/20 focus:border-farm-green text-lg">
-                    <SelectValue placeholder="Choose category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="product">🥕 Products</SelectItem>
-                    <SelectItem value="farm">🚜 Farms</SelectItem>
-                    <SelectItem value="event">📅 Events</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-3 text-foreground">Search for</label>
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-                  <Input 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="tomatoes, Green Valley Farm..."
-                    className="pl-12 h-14 text-lg border-farm-green/20 focus:border-farm-green"
-                  />
+                <div className="h-48 rounded-lg border border-border/20 overflow-hidden">
+                  <MapboxMapPreview coordinates={coordinates} className="h-full w-full" />
                 </div>
               </div>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-3 text-foreground">Within</label>
-                <Select value={maxDistance} onValueChange={setMaxDistance}>
-                  <SelectTrigger className="h-14 border-farm-green/20 focus:border-farm-green text-lg">
-                    <SelectValue placeholder="Distance" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1 mile</SelectItem>
-                    <SelectItem value="2">2 miles</SelectItem>
-                    <SelectItem value="3">3 miles</SelectItem>
-                    <SelectItem value="5">5 miles</SelectItem>
-                    <SelectItem value="10">10 miles</SelectItem>
-                    <SelectItem value="50">50 miles</SelectItem>
-                  </SelectContent>
-                </Select>
+            {/* Right Column - Search Preferences */}
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-8 h-8 bg-farm-green text-white rounded-full flex items-center justify-center text-sm font-semibold">2</div>
+                <h3 className="text-xl font-semibold text-foreground">What are you looking for?</h3>
+              </div>
+              
+              <div className="space-y-6">
+                {/* Category */}
+                <div>
+                  <label className="block text-sm font-medium mb-3 text-foreground">I'm looking for</label>
+                  <Select value={searchType} onValueChange={setSearchType}>
+                    <SelectTrigger className="h-14 border-farm-green/20 focus:border-farm-green text-lg">
+                      <SelectValue placeholder="Choose category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="product">🥕 Products</SelectItem>
+                      <SelectItem value="farm">🚜 Farms</SelectItem>
+                      <SelectItem value="event">📅 Events</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Distance */}
+                <div>
+                  <label className="block text-sm font-medium mb-3 text-foreground">Within</label>
+                  <Select value={maxDistance} onValueChange={setMaxDistance}>
+                    <SelectTrigger className="h-14 border-farm-green/20 focus:border-farm-green text-lg">
+                      <SelectValue placeholder="Select distance" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 mile</SelectItem>
+                      <SelectItem value="2">2 miles</SelectItem>
+                      <SelectItem value="3">3 miles</SelectItem>
+                      <SelectItem value="5">5 miles</SelectItem>
+                      <SelectItem value="10">10 miles</SelectItem>
+                      <SelectItem value="50">50 miles</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Search Input */}
+                <div>
+                  <label className="block text-sm font-medium mb-3 text-foreground">Search for</label>
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+                    <Input 
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="tomatoes, Green Valley Farm..."
+                      className="pl-12 h-14 text-lg border-farm-green/20 focus:border-farm-green"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
