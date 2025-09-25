@@ -2185,7 +2185,7 @@ export type Database = {
           delivery_notes?: string | null
           display_id?: number | null
           email?: string | null
-          id: string
+          id?: string
           is_draft_order?: boolean
           metadata?: Json | null
           no_notification?: boolean | null
