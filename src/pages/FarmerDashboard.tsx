@@ -24,9 +24,11 @@ import {
   TrendingUp,
   ShoppingCart,
   Wheat,
-  DollarSign
+  DollarSign,
+  FileText
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { OrdersTab } from "@/components/OrdersTab";
 import type { User } from "@supabase/supabase-js";
 
 interface FarmData {
@@ -456,9 +458,10 @@ const FarmerDashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="farm">My Farm</TabsTrigger>
+            <TabsTrigger value="products">Products</TabsTrigger>
+            <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
           
@@ -549,152 +552,70 @@ const FarmerDashboard = () => {
             </div>
           </TabsContent>
 
-          {/* Farm Tab */}
-          <TabsContent value="farm">
-            <div className="space-y-6">
-              {/* Farm Selector & Add Farm */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>My Farms</CardTitle>
-                    <CardDescription>Manage your farm locations and information</CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    {canAddMultipleFarms() && (
-                      <Button onClick={() => setAddFarmModalOpen(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Farm
-                      </Button>
-                    )}
-                    <Button onClick={() => navigate(`/farm/${selectedFarm?.id}`)} disabled={!selectedFarm}>
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Farm
-                    </Button>
-                    <Button onClick={handleEditFarm} disabled={!selectedFarm} variant="outline">
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Farm
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {farmData.length > 1 && (
-                    <div className="mb-6">
-                      <Label htmlFor="farm-selector">Select Farm</Label>
-                      <Select 
-                        value={selectedFarm?.id || ''} 
-                        onValueChange={(value) => {
-                          const farm = farmData.find(f => f.id === value);
-                          setSelectedFarm(farm || null);
-                        }}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select a farm" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {farmData.map((farm) => (
-                            <SelectItem key={farm.id} value={farm.id}>
-                              {farm.name} - {farm.address}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  {selectedFarm ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div>
-                          <h3 className="text-lg font-semibold mb-2">Basic Information</h3>
-                          <div className="space-y-3">
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Farm Name</p>
-                              <p className="text-lg">{selectedFarm.name}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Contact Person</p>
-                              <p>{selectedFarm.contact_person}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Email</p>
-                              <p>{selectedFarm.email}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Phone</p>
-                              <p>{selectedFarm.phone || 'Not provided'}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-4">
-                        <div>
-                          <h3 className="text-lg font-semibold mb-2">Location & Description</h3>
-                          <div className="space-y-3">
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Address</p>
-                              <p>{selectedFarm.address}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Farm Bio</p>
-                              <p className="text-sm">{selectedFarm.bio || 'No description available'}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-muted-foreground">Created</p>
-                              <p>{new Date(selectedFarm.created_at).toLocaleDateString()}</p>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <h3 className="text-lg font-semibold mb-2">Plan Limits</h3>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-sm">Products Used:</span>
-                              <span className="text-sm font-medium">
-                                {stats.totalProducts} / {currentPlan?.max_products === 0 ? '∞' : currentPlan?.max_products || 0}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm">Transaction Fee:</span>
-                              <span className="text-sm font-medium">{currentPlan?.transaction_fee || 0}%</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm">Multiple Farms:</span>
-                              <span className="text-sm font-medium">
-                                {canAddMultipleFarms() ? 'Allowed' : 'Not Available'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+          {/* Products Tab */}
+          <TabsContent value="products">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Products Management
+                </CardTitle>
+                <CardDescription>Manage your farm products and inventory</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {products.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Product</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {products.map((product) => (
+                          <TableRow key={product.id}>
+                            <TableCell className="font-medium">{product.title}</TableCell>
+                            <TableCell className="max-w-xs truncate">{product.description}</TableCell>
+                            <TableCell>
+                              <Badge variant={product.status === 'published' ? 'default' : 'secondary'}>
+                                {product.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{new Date(product.created_at).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                              <Button variant="outline" size="sm">
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   ) : (
                     <div className="text-center py-8">
-                      <Wheat className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">No Farm Information</h3>
+                      <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">No Products Yet</h3>
                       <p className="text-muted-foreground mb-4">
-                        Your farm profile hasn't been set up yet. Contact support to complete your farm setup.
+                        Start by adding your first product to begin selling.
                       </p>
-                      {canAddMultipleFarms() && (
-                        <Button onClick={() => setAddFarmModalOpen(true)}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Your First Farm
-                        </Button>
-                      )}
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Product
+                      </Button>
                     </div>
                   )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-                  {!canAddMultipleFarms() && farmData.length === 0 && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
-                      <p className="text-sm text-blue-800">
-                        Your current plan allows only one farm location. 
-                        Upgrade to a Business or higher plan to manage multiple farms.
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+          {/* Orders Tab */}
+          <TabsContent value="orders">
+            <OrdersTab farmId={selectedFarm?.id} />
           </TabsContent>
 
           {/* Settings Tab */}

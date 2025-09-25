@@ -34,15 +34,24 @@ const statusLabels = {
   delivered: 'Delivered',
 };
 
-export const OrdersTab: React.FC = () => {
+interface OrdersTabProps {
+  farmId?: string;
+}
+
+export const OrdersTab: React.FC<OrdersTabProps> = ({ farmId }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [farmId]);
 
   const fetchOrders = async () => {
+    if (!farmId) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('order')
@@ -50,7 +59,14 @@ export const OrdersTab: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setOrders((data || []) as Order[]);
+      
+      // Filter orders that contain products from this farm
+      const farmOrders = (data || []).filter((order: Order) => {
+        const cartItems = order.metadata?.cart_items || [];
+        return cartItems.some((item: any) => item.farmId === farmId);
+      });
+      
+      setOrders(farmOrders as Order[]);
     } catch (error: any) {
       console.error('Error fetching orders:', error);
       toast({
@@ -101,10 +117,16 @@ export const OrdersTab: React.FC = () => {
         <p className="text-muted-foreground">Manage your farm orders</p>
       </div>
 
-      {orders.length === 0 ? (
+      {!farmId ? (
         <Card>
           <CardContent className="p-6 text-center">
-            <p className="text-muted-foreground">No orders yet.</p>
+            <p className="text-muted-foreground">Please select a farm to view orders.</p>
+          </CardContent>
+        </Card>
+      ) : orders.length === 0 ? (
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-muted-foreground">No orders for this farm yet.</p>
           </CardContent>
         </Card>
       ) : (
