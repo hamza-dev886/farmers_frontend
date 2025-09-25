@@ -87,16 +87,18 @@ export const Header = () => {
       }
     );
 
-    // Check for existing session only once on component mount
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  // Separate effect to get initial session - only runs once
+  useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!isLoggingOut) {
         setSession(session);
         setUser(session?.user ?? null);
       }
     });
-
-    return () => subscription.unsubscribe();
-  }, [navigate, isLoggingOut]);
+  }, []);
 
   const handleSignOut = async () => {
     try {
