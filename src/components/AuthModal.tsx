@@ -154,6 +154,7 @@ export const AuthModal = ({ open, onOpenChange, onOpenFarmerModal }: AuthModalPr
         email: validatedData.email,
         password: validatedData.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: validatedData.fullName,
             phone: validatedData.phone || null,
