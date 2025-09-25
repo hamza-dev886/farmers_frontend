@@ -80,12 +80,17 @@ export default function Cart() {
     fetchFarmPricingPlans();
   }, [items]);
 
-  // Calculate totals
-  const subtotal = getTotalPrice();
+  // Calculate totals with safety checks
+  const subtotal = items.reduce((total, item) => {
+    const price = item.price || 0;
+    return total + (price * item.quantity);
+  }, 0);
+  
   const transactionFees = items.reduce((total, item) => {
+    const price = item.price || 0;
     const pricingPlan = farmPricingPlans[item.farmId];
-    if (pricingPlan) {
-      const itemTotal = item.price * item.quantity;
+    if (pricingPlan && price > 0) {
+      const itemTotal = price * item.quantity;
       return total + (itemTotal * pricingPlan.transaction_fee);
     }
     return total;
@@ -239,15 +244,23 @@ export default function Cart() {
                       
                       {/* Item price */}
                       <div className="text-right">
-                        <div className="font-semibold text-lg">
-                          ${(item.price * item.quantity).toFixed(2)}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          ${item.price.toFixed(2)} each
-                        </div>
-                        {item.compare_at_price && item.compare_at_price > item.price && (
-                          <div className="text-xs text-muted-foreground line-through">
-                            ${item.compare_at_price.toFixed(2)} each
+                        {item.price && item.price > 0 ? (
+                          <>
+                            <div className="font-semibold text-lg">
+                              ${(item.price * item.quantity).toFixed(2)}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              ${item.price.toFixed(2)} each
+                            </div>
+                            {item.compare_at_price && item.compare_at_price > item.price && (
+                              <div className="text-xs text-muted-foreground line-through">
+                                ${item.compare_at_price.toFixed(2)} each
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">
+                            Price not available
                           </div>
                         )}
                       </div>

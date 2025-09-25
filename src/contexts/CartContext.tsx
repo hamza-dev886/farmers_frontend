@@ -40,9 +40,22 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const savedCart = localStorage.getItem('farmers-stall-cart');
     if (savedCart) {
       try {
-        setItems(JSON.parse(savedCart));
+        const parsedItems = JSON.parse(savedCart);
+        // Filter out items without price information (legacy items)
+        const validItems = parsedItems.filter((item: any) => 
+          item.price !== undefined && item.price !== null
+        );
+        
+        // If we filtered out some items, show a message
+        if (validItems.length !== parsedItems.length) {
+          console.log('Removed legacy cart items without pricing information');
+        }
+        
+        setItems(validItems);
       } catch (error) {
         console.error('Error loading cart from localStorage:', error);
+        // Clear invalid cart data
+        localStorage.removeItem('farmers-stall-cart');
       }
     }
   }, []);
@@ -94,7 +107,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const getTotalPrice = () => {
-    return items.reduce((total, item) => total + (item.price * item.quantity), 0);
+    return items.reduce((total, item) => {
+      const price = item.price || 0;
+      return total + (price * item.quantity);
+    }, 0);
   };
 
   const value: CartContextType = {
