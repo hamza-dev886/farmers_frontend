@@ -8,6 +8,8 @@ export interface CartItem {
   quantity: number;
   farmName: string;
   farmId: string;
+  price: number;
+  compare_at_price?: number;
 }
 
 interface CartContextType {
@@ -17,6 +19,7 @@ interface CartContextType {
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
   getTotalItems: () => number;
+  getTotalPrice: () => number;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -90,6 +93,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return items.reduce((total, item) => total + item.quantity, 0);
   };
 
+  const getTotalPrice = () => {
+    return items.reduce((total, item) => total + (item.price * item.quantity), 0);
+  };
+
   const value: CartContextType = {
     items,
     addToCart,
@@ -97,6 +104,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updateQuantity,
     clearCart,
     getTotalItems,
+    getTotalPrice,
   };
 
   return (

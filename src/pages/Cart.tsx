@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,11 +7,90 @@ import { useCart } from "@/contexts/CartContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Header } from "@/components/Header";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Cart() {
-  const { items, updateQuantity, removeFromCart, clearCart, getTotalItems } = useCart();
+  const { items, updateQuantity, removeFromCart, clearCart, getTotalItems, getTotalPrice } = useCart();
   const navigate = useNavigate();
   const [isClearing, setIsClearing] = useState(false);
+  const [farmPricingPlans, setFarmPricingPlans] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(true);
+
+  // Fetch pricing plans for all farms in cart
+  useEffect(() => {
+    const fetchFarmPricingPlans = async () => {
+      const uniqueFarmIds = [...new Set(items.map(item => item.farmId))];
+      
+      if (uniqueFarmIds.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const pricingPromises = uniqueFarmIds.map(async (farmId) => {
+          // Get farm info to find farmer_id
+          const { data: farmData } = await supabase
+            .from('farms')
+            .select('farmer_id')
+            .eq('id', farmId)
+            .single();
+
+          if (farmData) {
+            // Get farmer's pricing plan
+            const { data: pricingData } = await supabase
+              .from('farm_pricing_plans')
+              .select(`
+                pricing_plans (
+                  transaction_fee,
+                  name
+                )
+              `)
+              .eq('user_id', farmData.farmer_id)
+              .eq('is_active', true)
+              .single();
+
+            return {
+              farmId,
+              pricingPlan: pricingData?.pricing_plans || { transaction_fee: 0.05, name: 'Default' }
+            };
+          }
+          return { farmId, pricingPlan: { transaction_fee: 0.05, name: 'Default' } };
+        });
+
+        const results = await Promise.all(pricingPromises);
+        const pricingMap = results.reduce((acc, result) => {
+          acc[result.farmId] = result.pricingPlan;
+          return acc;
+        }, {} as Record<string, any>);
+
+        setFarmPricingPlans(pricingMap);
+      } catch (error) {
+        console.error('Error fetching pricing plans:', error);
+        // Set default pricing plans
+        const defaultPricing = uniqueFarmIds.reduce((acc, farmId) => {
+          acc[farmId] = { transaction_fee: 0.05, name: 'Default' };
+          return acc;
+        }, {} as Record<string, any>);
+        setFarmPricingPlans(defaultPricing);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFarmPricingPlans();
+  }, [items]);
+
+  // Calculate totals
+  const subtotal = getTotalPrice();
+  const transactionFees = items.reduce((total, item) => {
+    const pricingPlan = farmPricingPlans[item.farmId];
+    if (pricingPlan) {
+      const itemTotal = item.price * item.quantity;
+      return total + (itemTotal * pricingPlan.transaction_fee);
+    }
+    return total;
+  }, 0);
+  const totalAmount = subtotal + transactionFees;
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity < 1) {
@@ -136,7 +215,7 @@ export default function Cart() {
                       </Button>
                     </div>
 
-                    {/* Quantity Controls */}
+                    {/* Quantity Controls and Price */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Button
@@ -157,6 +236,21 @@ export default function Cart() {
                           <Plus className="h-3 w-3" />
                         </Button>
                       </div>
+                      
+                      {/* Item price */}
+                      <div className="text-right">
+                        <div className="font-semibold text-lg">
+                          ${(item.price * item.quantity).toFixed(2)}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          ${item.price.toFixed(2)} each
+                        </div>
+                        {item.compare_at_price && item.compare_at_price > item.price && (
+                          <div className="text-xs text-muted-foreground line-through">
+                            ${item.compare_at_price.toFixed(2)} each
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -172,40 +266,65 @@ export default function Cart() {
               <CardTitle>Order Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span>Total Items:</span>
-                <span className="font-semibold">{getTotalItems()}</span>
-              </div>
-              
-              <Separator />
-              
-              <div className="space-y-3">
-                <Button 
-                  onClick={handleCheckout}
-                  variant="farm" 
-                  className="w-full"
-                  size="lg"
-                >
-                  Proceed to Checkout
-                </Button>
-                
-                <Button
-                  onClick={handleClearCart}
-                  disabled={isClearing}
-                  variant="outline"
-                  className="w-full"
-                >
-                  {isClearing ? "Clearing..." : "Clear Cart"}
-                </Button>
-                
-                <Button
-                  onClick={() => navigate('/')}
-                  variant="ghost"
-                  className="w-full"
-                >
-                  Continue Shopping
-                </Button>
-              </div>
+              {loading ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="text-sm text-muted-foreground mt-2">Calculating totals...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span>Subtotal ({getTotalItems()} items):</span>
+                      <span className="font-semibold">${subtotal.toFixed(2)}</span>
+                    </div>
+                    
+                    {transactionFees > 0 && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Transaction fees:</span>
+                        <span className="text-muted-foreground">${transactionFees.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="flex justify-between items-center text-lg font-bold">
+                    <span>Total:</span>
+                    <span>${totalAmount.toFixed(2)}</span>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-3">
+                    <Button 
+                      onClick={handleCheckout}
+                      variant="farm" 
+                      className="w-full"
+                      size="lg"
+                    >
+                      Proceed to Checkout
+                    </Button>
+                    
+                    <Button
+                      onClick={handleClearCart}
+                      disabled={isClearing}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      {isClearing ? "Clearing..." : "Clear Cart"}
+                    </Button>
+                    
+                    <Button
+                      onClick={() => navigate('/')}
+                      variant="ghost"
+                      className="w-full"
+                    >
+                      Continue Shopping
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -46,6 +46,8 @@ export const ProductCard = ({ product, farm, availableQuantity = 0 }: ProductCar
         thumbnail: product.thumbnail,
         farmName: farm.name,
         farmId: farm.id,
+        price: product.price || 0,
+        compare_at_price: product.compare_at_price,
       });
       
       await new Promise(resolve => setTimeout(resolve, 300)); // Small delay for UX
