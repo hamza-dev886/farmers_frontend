@@ -250,9 +250,14 @@ const FarmDashboard = () => {
   };
 
   const fetchCurrentPlan = async () => {
-    if (!user) return;
+    console.log('fetchCurrentPlan called, user:', user);
+    if (!user) {
+      console.log('No user found, skipping pricing plan fetch');
+      return;
+    }
 
     try {
+      console.log('Fetching pricing plan for user ID:', user.id);
       const { data, error } = await supabase
         .from('farm_pricing_plans')
         .select(`
@@ -271,10 +276,12 @@ const FarmDashboard = () => {
         .eq('is_active', true)
         .single();
 
+      console.log('Pricing plan query result:', { data, error });
+
       if (error && error.code !== 'PGRST116') throw error;
 
       if (data) {
-        console.log('Pricing plan data:', data);
+        console.log('Setting pricing plan data:', data);
         setCurrentPlan({
           plan_name: data.pricing_plans?.name || 'Unknown',
           price: data.pricing_plans?.price || 'N/A',
@@ -286,10 +293,30 @@ const FarmDashboard = () => {
           allowed_to_business_in_multiple_location: data.pricing_plans?.allowed_to_business_in_multiple_location || false
         });
       } else {
-        console.log('No pricing plan data found');
+        console.log('No pricing plan data found, setting default values');
+        setCurrentPlan({
+          plan_name: 'No Plan',
+          price: 'N/A',
+          billing_cycle: 'N/A',
+          assigned_at: null,
+          max_products: 0,
+          transaction_fee: 0,
+          can_create_multiple_stand: false,
+          allowed_to_business_in_multiple_location: false
+        });
       }
     } catch (error) {
       console.error('Error fetching current plan:', error);
+      setCurrentPlan({
+        plan_name: 'Error',
+        price: 'N/A',
+        billing_cycle: 'N/A',
+        assigned_at: null,
+        max_products: 0,
+        transaction_fee: 0,
+        can_create_multiple_stand: false,
+        allowed_to_business_in_multiple_location: false
+      });
     }
   };
 
