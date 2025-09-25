@@ -226,23 +226,13 @@ const FarmDashboard = () => {
     if (!farmId) return;
 
     try {
-      const { data, error } = await supabase
-        .from('inventory_tracking')
-        .select('*')
-        .eq('farm_id', farmId);
-
-      if (error) throw error;
-
-      setInventory(data || []);
-      
-      // Update stats for low stock items
-      const lowStock = (data || []).filter(item => 
-        item.quantity_available <= item.low_stock_threshold
-      ).length;
+      // Since inventory_tracking table was removed, we'll use product_variant
+      // This is a placeholder - inventory management now uses product_variant table
+      setInventory([]);
       
       setStats(prev => ({
         ...prev,
-        lowStockItems: lowStock
+        lowStockItems: 0
       }));
     } catch (error) {
       console.error('Error fetching inventory:', error);

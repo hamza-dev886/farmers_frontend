@@ -3,107 +3,74 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 
 interface InventoryItem {
-  id?: string;
-  variant_id: string;
-  farm_id: string;
-  quantity_available: number;
-  quantity_reserved: number;
-  low_stock_threshold: number;
-  location: string;
-  notes: string;
-  unit_type: string;
-  price_per_unit: number;
-  total_price: number;
-}
-
-interface ProductVariant {
   id: string;
   title: string;
   sku?: string;
   product_id: string;
-  product_title?: string;
+  manage_inventory: boolean;
+  allow_backorder: boolean;
+  created_at: string;
+  updated_at: string;
+  product?: {
+    title: string;
+    handle: string;
+  };
+  inventory_levels?: {
+    stocked_quantity: number;
+    reserved_quantity: number;
+    location_id: string;
+  }[];
+  price_set?: {
+    amount: number;
+    currency_code: string;
+  };
 }
 
 interface Product {
   id: string;
   title: string;
-  variants?: ProductVariant[];
+  handle: string;
+  status: string;
 }
 
 interface InventoryModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  item?: InventoryItem | null;
+  item: InventoryItem | null;
   onSave: (item: InventoryItem) => Promise<void>;
   products: Product[];
   farmId: string;
 }
 
-export function InventoryModal({ open, onOpenChange, item, onSave, products, farmId }: InventoryModalProps) {
-  const { toast } = useToast();
+export const InventoryModal = ({ open, onOpenChange, item, onSave, products, farmId }: InventoryModalProps) => {
+  const [formData, setFormData] = useState<Partial<InventoryItem>>({});
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState<InventoryItem>({
-    variant_id: '',
-    farm_id: farmId,
-    quantity_available: 0,
-    quantity_reserved: 0,
-    low_stock_threshold: 10,
-    location: '',
-    notes: '',
-    unit_type: 'pieces',
-    price_per_unit: 0,
-    total_price: 0
-  });
+  const { toast } = useToast();
 
   useEffect(() => {
     if (item) {
       setFormData(item);
     } else {
       setFormData({
-        variant_id: '',
-        farm_id: farmId,
-        quantity_available: 0,
-        quantity_reserved: 0,
-        low_stock_threshold: 10,
-        location: '',
-        notes: '',
-        unit_type: 'pieces',
-        price_per_unit: 0,
-        total_price: 0
+        title: '',
+        sku: '',
+        product_id: '',
+        manage_inventory: true,
+        allow_backorder: false
       });
     }
-  }, [item, farmId]);
+  }, [item]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.variant_id) {
+  const handleSave = async () => {
+    if (!formData.title || !formData.product_id) {
       toast({
-        title: "Validation Error",
-        description: "Please select a product variant.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (formData.quantity_available < 0) {
-      toast({
-        title: "Validation Error", 
-        description: "Available quantity cannot be negative.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (formData.low_stock_threshold < 0) {
-      toast({
-        title: "Validation Error",
-        description: "Low stock threshold cannot be negative.",
+        title: "Error",
+        description: "Please fill in all required fields.",
         variant: "destructive"
       });
       return;
@@ -111,17 +78,16 @@ export function InventoryModal({ open, onOpenChange, item, onSave, products, far
 
     setLoading(true);
     try {
-      await onSave(formData);
-      onOpenChange(false);
+      await onSave(formData as InventoryItem);
       toast({
         title: "Success",
         description: item ? "Inventory item updated successfully." : "Inventory item created successfully."
       });
+      onOpenChange(false);
     } catch (error) {
-      console.error('Error saving inventory item:', error);
       toast({
         title: "Error",
-        description: "Failed to save inventory item. Please try again.",
+        description: "Failed to save inventory item.",
         variant: "destructive"
       });
     } finally {
@@ -129,213 +95,84 @@ export function InventoryModal({ open, onOpenChange, item, onSave, products, far
     }
   };
 
-  const commonLocations = [
-    "Main Storage",
-    "Greenhouse 1", 
-    "Greenhouse 2",
-    "Cold Storage",
-    "Processing Area",
-    "Packaging Area",
-    "Field Storage",
-    "Barn",
-    "Warehouse"
-  ];
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{item ? 'Edit Inventory Item' : 'Add Inventory Item'}</DialogTitle>
           <DialogDescription>
-            {item ? 'Update inventory details and stock levels.' : 'Add a new inventory item to track stock levels.'}
+            {item ? 'Update the inventory item details.' : 'Create a new inventory item for your farm.'}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Product Variant Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="variant_id">Product Variant *</Label>
-            <Select 
-              value={formData.variant_id} 
-              onValueChange={(value) => setFormData({...formData, variant_id: value})}
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="product_id">Product *</Label>
+            <Select
+              value={formData.product_id || ''}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, product_id: value }))}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a product variant" />
+                <SelectValue placeholder="Select a product" />
               </SelectTrigger>
               <SelectContent>
-                {products.flatMap((product) => 
-                  product.variants?.map((variant) => (
-                    <SelectItem key={variant.id} value={variant.id}>
-                      {product.title} - {variant.title || variant.sku || 'Default'}
-                    </SelectItem>
-                  )) || []
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Location */}
-          <div className="space-y-2">
-            <Label htmlFor="location">Location</Label>
-            <Select 
-              value={formData.location || ''} 
-              onValueChange={(value) => setFormData({...formData, location: value})}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select or type location" />
-              </SelectTrigger>
-              <SelectContent>
-                {commonLocations.map((location) => (
-                  <SelectItem key={location} value={location}>
-                    {location}
+                {products.map((product) => (
+                  <SelectItem key={product.id} value={product.id}>
+                    {product.title}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="title">Variant Title *</Label>
             <Input
-              placeholder="Or enter custom location"
-              value={formData.location}
-              onChange={(e) => setFormData({...formData, location: e.target.value})}
+              id="title"
+              value={formData.title || ''}
+              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+              placeholder="e.g., Red - Large"
             />
           </div>
 
-          {/* Unit and Pricing */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="unit_type">Unit Type *</Label>
-              <Select 
-                value={formData.unit_type} 
-                onValueChange={(value) => {
-                  const newFormData = {...formData, unit_type: value};
-                  newFormData.total_price = newFormData.quantity_available * newFormData.price_per_unit;
-                  setFormData(newFormData);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pieces">Pieces</SelectItem>
-                  <SelectItem value="kg">Kilograms (kg)</SelectItem>
-                  <SelectItem value="lbs">Pounds (lbs)</SelectItem>
-                  <SelectItem value="liters">Liters</SelectItem>
-                  <SelectItem value="gallons">Gallons</SelectItem>
-                  <SelectItem value="boxes">Boxes</SelectItem>
-                  <SelectItem value="bunches">Bunches</SelectItem>
-                  <SelectItem value="bags">Bags</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="price_per_unit">Price per Unit (USD) *</Label>
-              <Input
-                id="price_per_unit"
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.price_per_unit}
-                onChange={(e) => {
-                  const pricePerUnit = parseFloat(e.target.value) || 0;
-                  setFormData({
-                    ...formData, 
-                    price_per_unit: pricePerUnit,
-                    total_price: formData.quantity_available * pricePerUnit
-                  });
-                }}
-                placeholder="0.00"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="total_price">Total Price (USD)</Label>
-              <Input
-                id="total_price"
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.total_price}
-                onChange={(e) => {
-                  const totalPrice = parseFloat(e.target.value) || 0;
-                  setFormData({
-                    ...formData, 
-                    total_price: totalPrice,
-                    price_per_unit: formData.quantity_available > 0 ? totalPrice / formData.quantity_available : 0
-                  });
-                }}
-                placeholder="0.00"
-              />
-            </div>
-          </div>
-
-          {/* Quantities */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="quantity_available">Available Quantity *</Label>
-              <Input
-                id="quantity_available"
-                type="number"
-                min="0"
-                value={formData.quantity_available}
-                onChange={(e) => {
-                  const quantity = parseInt(e.target.value) || 0;
-                  setFormData({
-                    ...formData, 
-                    quantity_available: quantity,
-                    total_price: quantity * formData.price_per_unit
-                  });
-                }}
-                placeholder="0"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="quantity_reserved">Reserved Quantity</Label>
-              <Input
-                id="quantity_reserved"
-                type="number"
-                min="0"
-                value={formData.quantity_reserved}
-                onChange={(e) => setFormData({...formData, quantity_reserved: parseInt(e.target.value) || 0})}
-                placeholder="0"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="low_stock_threshold">Low Stock Alert</Label>
-              <Input
-                id="low_stock_threshold"
-                type="number"
-                min="0"
-                value={formData.low_stock_threshold}
-                onChange={(e) => setFormData({...formData, low_stock_threshold: parseInt(e.target.value) || 0})}
-                placeholder="10"
-              />
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({...formData, notes: e.target.value})}
-              placeholder="Add any notes about this inventory item..."
-              rows={3}
+          <div className="grid gap-2">
+            <Label htmlFor="sku">SKU</Label>
+            <Input
+              id="sku"
+              value={formData.sku || ''}
+              onChange={(e) => setFormData(prev => ({ ...prev, sku: e.target.value }))}
+              placeholder="e.g., RED-LG-001"
             />
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Saving...' : item ? 'Update Item' : 'Add Item'}
-            </Button>
-          </DialogFooter>
-        </form>
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="manage_inventory"
+              checked={formData.manage_inventory || false}
+              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, manage_inventory: checked }))}
+            />
+            <Label htmlFor="manage_inventory">Manage inventory</Label>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="allow_backorder"
+              checked={formData.allow_backorder || false}
+              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, allow_backorder: checked }))}
+            />
+            <Label htmlFor="allow_backorder">Allow backorders</Label>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={loading}>
+            {loading ? 'Saving...' : 'Save'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-}
+};

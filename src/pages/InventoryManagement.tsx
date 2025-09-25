@@ -16,22 +16,26 @@ import type { User } from "@supabase/supabase-js";
 
 interface InventoryItem {
   id: string;
-  variant_id: string;
-  farm_id: string;
-  quantity_available: number;
-  quantity_reserved: number;
-  low_stock_threshold: number;
-  location: string;
-  notes: string;
-  last_updated_by: string;
+  title: string;
+  sku?: string;
+  product_id: string;
+  manage_inventory: boolean;
+  allow_backorder: boolean;
   created_at: string;
   updated_at: string;
-  unit_type: string;
-  price_per_unit: number;
-  total_price: number;
-  product_name?: string;
-  variant_title?: string;
-  sku?: string;
+  product?: {
+    title: string;
+    handle: string;
+  };
+  inventory_levels?: {
+    stocked_quantity: number;
+    reserved_quantity: number;
+    location_id: string;
+  }[];
+  price_set?: {
+    amount: number;
+    currency_code: string;
+  };
 }
 
 interface ProductVariant {
@@ -154,14 +158,22 @@ const InventoryManagement = () => {
     if (!farmId) return;
 
     try {
+      // Get product variants for this farm with inventory levels and pricing
       const { data, error } = await supabase
-        .from('inventory_tracking')
+        .from('product_variant')
         .select(`
           *,
-          farms!inventory_tracking_farm_id_fkey(name)
+          product:product_id(title, handle),
+          inventory_level:inventory_level!product_variant_inventory_item_id_fkey(
+            stocked_quantity,
+            reserved_quantity,
+            location_id
+          ),
+          product_variant_price_set!inner(
+            id
+          )
         `)
-        .eq('farm_id', farmId)
-        .order('created_at', { ascending: false });
+        .eq('product.farm_products.farm_id', farmId);
 
       if (error) throw error;
       setInventory(data || []);
@@ -183,7 +195,7 @@ const InventoryManagement = () => {
         .from('farm_products')
         .select(`
           product_id,
-          product(id, title, handle, status)
+          product:product_id(id, title, handle, status)
         `)
         .eq('farm_id', farmId);
 
@@ -205,25 +217,28 @@ const InventoryManagement = () => {
     try {
       if (editingItem) {
         const { error } = await supabase
-          .from('inventory_tracking')
+          .from('product_variant')
           .update({
-            variant_id: inventoryData.variant_id,
-            quantity_available: inventoryData.quantity_available,
-            quantity_reserved: inventoryData.quantity_reserved,
-            low_stock_threshold: inventoryData.low_stock_threshold,
-            location: inventoryData.location,
-            notes: inventoryData.notes,
-            last_updated_by: user?.id
+            title: inventoryData.title,
+            sku: inventoryData.sku,
+            manage_inventory: inventoryData.manage_inventory,
+            allow_backorder: inventoryData.allow_backorder
           })
           .eq('id', editingItem.id);
 
         if (error) throw error;
       } else {
+        // Create new variant
+        const variantId = crypto.randomUUID();
         const { error } = await supabase
-          .from('inventory_tracking')
+          .from('product_variant')
           .insert({
-            ...inventoryData,
-            last_updated_by: user?.id
+            id: variantId,
+            title: inventoryData.title,
+            sku: inventoryData.sku,
+            product_id: inventoryData.product_id,
+            manage_inventory: inventoryData.manage_inventory,
+            allow_backorder: inventoryData.allow_backorder
           });
 
         if (error) throw error;
@@ -242,7 +257,7 @@ const InventoryManagement = () => {
 
     try {
       const { error } = await supabase
-        .from('inventory_tracking')
+        .from('product_variant')
         .delete()
         .eq('id', deletingItem.id);
 
@@ -268,28 +283,11 @@ const InventoryManagement = () => {
 
   const handleQuickAdjustment = async (itemId: string, adjustment: number, type: 'add' | 'remove') => {
     try {
-      const item = inventory.find(i => i.id === itemId);
-      if (!item) return;
-
-      const newQuantity = type === 'add' 
-        ? item.quantity_available + adjustment
-        : Math.max(0, item.quantity_available - adjustment);
-
-      const { error } = await supabase
-        .from('inventory_tracking')
-        .update({
-          quantity_available: newQuantity,
-          last_updated_by: user?.id
-        })
-        .eq('id', itemId);
-
-      if (error) throw error;
-
-      await fetchInventory();
-      
+      // This would need to update inventory_level table
       toast({
-        title: "Success",
-        description: `Stock ${type === 'add' ? 'increased' : 'decreased'} by ${adjustment}.`
+        title: "Info",
+        description: "Inventory adjustments need to be implemented with proper inventory levels.",
+        variant: "default"
       });
     } catch (error) {
       console.error('Error adjusting stock:', error);
@@ -303,37 +301,13 @@ const InventoryManagement = () => {
 
   const handleDetailedAdjustment = async (itemId: string, quantity: number, type: string, reason: string) => {
     try {
-      const item = inventory.find(i => i.id === itemId);
-      if (!item) return;
-
-      let newQuantity: number;
-      switch (type) {
-        case 'increase':
-          newQuantity = item.quantity_available + quantity;
-          break;
-        case 'decrease':
-          newQuantity = Math.max(0, item.quantity_available - quantity);
-          break;
-        case 'set':
-          newQuantity = quantity;
-          break;
-        default:
-          newQuantity = item.quantity_available;
-      }
-
-      const { error } = await supabase
-        .from('inventory_tracking')
-        .update({
-          quantity_available: newQuantity,
-          last_updated_by: user?.id,
-          notes: `${item.notes || ''}\n${new Date().toISOString()}: ${reason} (${type}: ${quantity})`
-        })
-        .eq('id', itemId);
-
-      if (error) throw error;
-
-      await fetchInventory();
+      // This would need to update inventory_level table
       setAdjustingItem(null);
+      toast({
+        title: "Info",
+        description: "Inventory adjustments need to be implemented with proper inventory levels.",
+        variant: "default"
+      });
     } catch (error) {
       console.error('Error making detailed adjustment:', error);
       throw error;
@@ -343,9 +317,11 @@ const InventoryManagement = () => {
   const getInventoryStats = () => {
     const totalItems = inventory.length;
     const lowStockItems = inventory.filter(item => 
-      item.quantity_available <= item.low_stock_threshold
+      item.inventory_levels?.[0]?.stocked_quantity && item.inventory_levels[0].stocked_quantity <= 10
     ).length;
-    const totalValue = inventory.reduce((sum, item) => sum + (item.quantity_available * 10), 0); // Mock price
+    const totalValue = inventory.reduce((sum, item) => 
+      sum + (item.inventory_levels?.[0]?.stocked_quantity || 0) * (item.price_set?.amount || 0), 0
+    );
     const lastUpdated = inventory.length > 0 
       ? inventory.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0].updated_at
       : new Date().toISOString();
@@ -432,7 +408,7 @@ const InventoryManagement = () => {
                   className="h-20 flex-col"
                   onClick={() => {
                     const lowStockItem = inventory.find(item => 
-                      item.quantity_available <= item.low_stock_threshold
+                      item.inventory_levels?.[0]?.stocked_quantity && item.inventory_levels[0].stocked_quantity <= 10
                     );
                     if (lowStockItem) {
                       setAdjustingItem(lowStockItem);
@@ -448,7 +424,6 @@ const InventoryManagement = () => {
                   variant="outline" 
                   className="h-20 flex-col"
                   onClick={() => {
-                    // Export functionality would go here
                     toast({
                       title: "Export Started",
                       description: "Your inventory report is being generated."
@@ -503,8 +478,8 @@ const InventoryManagement = () => {
             if (!open) setAdjustingItem(null);
           }}
           itemId={adjustingItem?.id}
-          currentQuantity={adjustingItem?.quantity_available}
-          itemName={adjustingItem?.product_name || `Item ${adjustingItem?.variant_id?.slice(0, 8)}`}
+          currentQuantity={adjustingItem?.inventory_levels?.[0]?.stocked_quantity}
+          itemName={adjustingItem?.title || `Item ${adjustingItem?.id?.slice(0, 8)}`}
           onAdjust={handleDetailedAdjustment}
         />
 
