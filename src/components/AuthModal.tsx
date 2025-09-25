@@ -14,12 +14,12 @@ import { User, UserPlus, Sprout, Wheat } from "lucide-react";
 
 // Validation schemas
 const loginSchema = z.object({
-  email: z.string().trim().email({ message: "Invalid email address" }),
+  email: z.string().trim().min(1, { message: "Email is required" }).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: "Invalid email address" }),
   password: z.string().min(6, { message: "Password must be at least 6 characters" })
 });
 
 const signupSchema = z.object({
-  email: z.string().trim().email({ message: "Invalid email address" }).max(255, { message: "Email must be less than 255 characters" }),
+  email: z.string().trim().min(1, { message: "Email is required" }).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: "Invalid email address" }).max(255, { message: "Email must be less than 255 characters" }),
   password: z.string().min(6, { message: "Password must be at least 6 characters" }).max(100, { message: "Password must be less than 100 characters" }),
   confirmPassword: z.string(),
   fullName: z.string().trim().min(1, { message: "Full name is required" }).max(100, { message: "Name must be less than 100 characters" }),
