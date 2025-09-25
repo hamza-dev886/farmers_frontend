@@ -80,117 +80,78 @@ const Index = () => {
     setIsSearching(true);
     
     console.log('Search params:', params);
-    console.log('Available farms:', farms);
     
     try {
-      let filteredResults = [...farms];
-      
-      // Filter by search type and query
       if (params.searchType === 'product') {
-        // For product searches, match against common farm products
-        const productKeywords = params.searchQuery.toLowerCase();
-        console.log('Searching for product:', productKeywords);
+        // Use edge function for product search with distance calculation
+        console.log('Calling product search edge function...');
         
-        const farmProductMap = {
-          'duck': ['duck', 'poultry', 'meat', 'farm'],
-          'ducks': ['duck', 'poultry', 'meat', 'farm'],
-          'chicken': ['chicken', 'poultry', 'meat', 'farm'],
-          'egg': ['egg', 'poultry', 'farm'],
-          'tomato': ['tomato', 'vegetable', 'produce', 'farm'],
-          'vegetable': ['vegetable', 'produce', 'farm', 'organic'],
-          'fruit': ['fruit', 'produce', 'farm', 'organic'],
-          'organic': ['organic', 'farm'],
-          'fresh': ['fresh', 'produce', 'farm'],
-          'meat': ['meat', 'poultry', 'farm']
-        };
-        
-        filteredResults = farms.filter(farm => {
-          const farmText = `${farm.name} ${farm.bio || ''} ${farm.address}`.toLowerCase();
-          console.log('Checking farm:', farm.name, 'Text:', farmText);
-          
-          // Direct keyword match
-          if (farmText.includes(productKeywords)) {
-            console.log('Direct match found for:', farm.name);
-            return true;
+        const { data, error } = await supabase.functions.invoke('product-search', {
+          body: {
+            searchQuery: params.searchQuery,
+            userLocation: params.coordinates,
+            maxDistance: params.maxDistance
           }
-          
-          // Check if farm might sell this product based on keywords
-          const relevantKeywords = farmProductMap[productKeywords] || [productKeywords];
-          const hasMatch = relevantKeywords.some(keyword => farmText.includes(keyword));
-          if (hasMatch) {
-            console.log('Keyword match found for:', farm.name, 'with keywords:', relevantKeywords);
-          }
-          return hasMatch;
         });
         
-        console.log('After product filtering:', filteredResults.length, 'results');
-      } else if (params.searchType === 'farm') {
-        // Search farm names and descriptions
-        filteredResults = farms.filter(farm => 
-          farm.name.toLowerCase().includes(params.searchQuery.toLowerCase()) ||
-          (farm.bio && farm.bio.toLowerCase().includes(params.searchQuery.toLowerCase())) ||
-          farm.address.toLowerCase().includes(params.searchQuery.toLowerCase())
-        );
-      } else if (params.searchType === 'event') {
-        // For now, return farms that might host events
-        filteredResults = farms.filter(farm => 
-          (farm.bio && farm.bio.toLowerCase().includes('event')) ||
-          (farm.bio && farm.bio.toLowerCase().includes('workshop')) ||
-          (farm.bio && farm.bio.toLowerCase().includes('visit'))
-        );
-      }
-      
-      // Apply distance filtering (basic implementation)
-      if (params.coordinates && params.maxDistance) {
-        console.log('Applying distance filter:', params.maxDistance, 'miles from', params.coordinates);
-        const maxDistanceKm = parseFloat(params.maxDistance) * 1.60934; // Convert miles to km
+        if (error) {
+          console.error('Product search error:', error);
+          setSearchResults([]);
+        } else {
+          console.log('Product search results:', data);
+          setSearchResults(data.results || []);
+        }
+      } else {
+        // For farm and event searches, use the existing logic
+        let filteredResults = [...farms];
         
-        const beforeDistance = filteredResults.length;
-        filteredResults = filteredResults.filter(farm => {
-          // For farms without coordinates, include them if they're in a reasonable distance based on address
-          if (!farm.location || !farm.location.lat || !farm.location.lng) {
-            console.log('Farm without coordinates - checking by address:', farm.name, farm.address);
-            
-            // Simple text-based location matching for farms without coordinates
-            // If the farm address contains "Brooklyn" and user searched in Brooklyn area, include it
-            const farmAddress = farm.address.toLowerCase();
-            const [userLng, userLat] = params.coordinates;
-            
-            // Brooklyn coordinates are roughly around -73.9, 40.6
-            // If user is searching in Brooklyn area (within these bounds) and farm is in Brooklyn, include it
-            if (userLng > -74.1 && userLng < -73.8 && userLat > 40.5 && userLat < 40.8) {
-              if (farmAddress.includes('brooklyn') || farmAddress.includes('new york')) {
-                console.log('Farm in Brooklyn area included:', farm.name);
-                return true;
+        if (params.searchType === 'farm') {
+          filteredResults = farms.filter(farm => 
+            farm.name.toLowerCase().includes(params.searchQuery.toLowerCase()) ||
+            (farm.bio && farm.bio.toLowerCase().includes(params.searchQuery.toLowerCase())) ||
+            farm.address.toLowerCase().includes(params.searchQuery.toLowerCase())
+          );
+        } else if (params.searchType === 'event') {
+          filteredResults = farms.filter(farm => 
+            (farm.bio && farm.bio.toLowerCase().includes('event')) ||
+            (farm.bio && farm.bio.toLowerCase().includes('workshop')) ||
+            (farm.bio && farm.bio.toLowerCase().includes('visit'))
+          );
+        }
+        
+        // Apply distance filtering for farm/event searches
+        if (params.coordinates && params.maxDistance) {
+          console.log('Applying distance filter:', params.maxDistance, 'miles from', params.coordinates);
+          const maxDistanceKm = parseFloat(params.maxDistance) * 1.60934;
+          
+          filteredResults = filteredResults.filter(farm => {
+            if (!farm.location || !farm.location.lat || !farm.location.lng) {
+              const farmAddress = farm.address.toLowerCase();
+              const [userLng, userLat] = params.coordinates;
+              
+              if (userLng > -74.1 && userLng < -73.8 && userLat > 40.5 && userLat < 40.8) {
+                if (farmAddress.includes('brooklyn') || farmAddress.includes('new york')) {
+                  return true;
+                }
               }
+              return false;
             }
             
-            return false;
-          }
-          
-          // Simple distance calculation (not perfectly accurate but good enough for demo)
-          const farmLat = farm.location.lat;
-          const farmLng = farm.location.lng;
-          // Coordinates from geocoding are typically [lng, lat], so swap them
-          const userLat = params.coordinates[1];
-          const userLng = params.coordinates[0];
-          
-          console.log('Farm coords:', farmLat, farmLng, 'User coords:', userLat, userLng);
-          
-          const distance = Math.sqrt(
-            Math.pow(farmLat - userLat, 2) + Math.pow(farmLng - userLng, 2)
-          ) * 111; // Rough conversion to km
-          
-          console.log('Distance to', farm.name, ':', distance, 'km, max:', maxDistanceKm);
-          
-          return distance <= maxDistanceKm;
-        });
+            const farmLat = farm.location.lat;
+            const farmLng = farm.location.lng;
+            const userLat = params.coordinates[1];
+            const userLng = params.coordinates[0];
+            
+            const distance = Math.sqrt(
+              Math.pow(farmLat - userLat, 2) + Math.pow(farmLng - userLng, 2)
+            ) * 111;
+            
+            return distance <= maxDistanceKm;
+          });
+        }
         
-        console.log('After distance filtering:', filteredResults.length, 'results (was', beforeDistance, ')');
+        setSearchResults(filteredResults);
       }
-      
-      console.log('Final search results:', filteredResults);
-      setSearchResults(filteredResults);
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
