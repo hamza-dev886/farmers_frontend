@@ -38,8 +38,7 @@ export default function Cart() {
   };
 
   const handleCheckout = () => {
-    // TODO: Implement checkout functionality
-    toast.info("Checkout functionality coming soon!");
+    navigate('/checkout');
   };
 
   if (items.length === 0) {
