@@ -193,13 +193,27 @@ const AdminDashboard = () => {
 
       if (profilesError) throw profilesError;
 
-      // Combine the data
+      // Get farmer applications as fallback for missing profile data
+      const { data: applicationsData, error: applicationsError } = await supabase
+        .from('farmer_applications')
+        .select('user_id, email, contact_person')
+        .in('user_id', userIds);
+
+      if (applicationsError) throw applicationsError;
+
+      // Combine the data with fallbacks
       const formattedData: FarmerPlanAssignment[] = (planData || []).map(item => {
         const profile = profilesData?.find(p => p.id === item.user_id);
+        const application = applicationsData?.find(app => app.user_id === item.user_id);
+        
+        // Use profile data if available, otherwise fall back to application data
+        const email = profile?.email || application?.email || 'No email found';
+        const fullName = profile?.full_name || application?.contact_person || 'No name found';
+        
         return {
           user_id: item.user_id,
-          user_email: profile?.email || 'N/A',
-          user_full_name: profile?.full_name || 'N/A',
+          user_email: email,
+          user_full_name: fullName,
           current_plan_id: item.pricing_plan_id,
           current_plan_name: item.pricing_plans?.name || 'Unknown',
           assigned_at: item.assigned_at,
