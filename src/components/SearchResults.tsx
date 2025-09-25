@@ -30,19 +30,27 @@ export const SearchResults = ({ searchParams, results, isLoading }: SearchResult
       if (searchParams.searchType !== 'product' || !results.length) return;
 
       try {
-        // Extract all variant IDs from results
+        // Extract all variant IDs and product IDs from results
         const variantIds = results.flatMap(farm => 
           farm.products?.flatMap((product: any) => 
             product.variants?.map((variant: any) => variant.id) || []
           ) || []
         );
-
-        if (variantIds.length === 0) return;
+        
+        // Also collect product IDs for products without variants (fallback)
+        const productIds = results.flatMap(farm => 
+          farm.products?.map((product: any) => product.id) || []
+        );
+        
+        // Combine variant IDs and product IDs for the query
+        const allIds = [...variantIds, ...productIds];
+        
+        if (allIds.length === 0) return;
 
         const { data, error } = await supabase
           .from('inventory_tracking')
           .select('variant_id, quantity_available')
-          .in('variant_id', variantIds);
+          .in('variant_id', allIds);
 
         if (error) throw error;
 
@@ -134,9 +142,12 @@ export const SearchResults = ({ searchParams, results, isLoading }: SearchResult
                           {farm.distance.toFixed(1)} miles away
                         </span>
                         <span className="text-sm font-medium">
-                          {product.variants?.reduce((total: number, variant: any) => 
-                            total + (productInventory[variant.id] || 0), 0
-                          ) || 0} available
+                          {product.variants && product.variants.length > 0 
+                            ? product.variants.reduce((total: number, variant: any) => 
+                                total + (productInventory[variant.id] || 0), 0
+                              )
+                            : (productInventory[product.id] || 0)
+                          } available
                         </span>
                       </div>
                     </div>
@@ -169,9 +180,11 @@ export const SearchResults = ({ searchParams, results, isLoading }: SearchResult
                         distance: farm.distance
                       }}
                       availableQuantity={
-                        product.variants?.reduce((total: number, variant: any) => 
-                          total + (productInventory[variant.id] || 0), 0
-                        ) || 0
+                        product.variants && product.variants.length > 0 
+                          ? product.variants.reduce((total: number, variant: any) => 
+                              total + (productInventory[variant.id] || 0), 0
+                            )
+                          : (productInventory[product.id] || 0)
                       }
                     />
                   )) || []
@@ -217,9 +230,12 @@ export const SearchResults = ({ searchParams, results, isLoading }: SearchResult
                         <p className="text-sm text-muted-foreground mb-2">{farm.name} • {farm.distance.toFixed(1)} miles</p>
                         <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{product.description}</p>
                         <span className="text-xs font-medium text-farm-green">
-                          {product.variants?.reduce((total: number, variant: any) => 
-                            total + (productInventory[variant.id] || 0), 0
-                          ) || 0} available
+                          {product.variants && product.variants.length > 0 
+                            ? product.variants.reduce((total: number, variant: any) => 
+                                total + (productInventory[variant.id] || 0), 0
+                              )
+                            : (productInventory[product.id] || 0)
+                          } available
                         </span>
                       </div>
                     )) || []
