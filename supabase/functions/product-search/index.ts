@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
 
     const mapboxToken = configData.value;
 
-    // Search for products and get related farm information with variants
+    // Search for products and get related farm information with variants and inventory
     const { data: productResults, error: productError } = await supabase
       .from('product')
       .select(`
@@ -59,7 +59,10 @@ Deno.serve(async (req) => {
         product_variant(
           id,
           title,
-          sku
+          sku,
+          inventory_tracking(
+            quantity_available
+          )
         ),
         farm_products!inner(
           farm_id,
@@ -143,13 +146,28 @@ Deno.serve(async (req) => {
                 const fps = p.farm_products as any[];
                 return fps && fps.length > 0 && fps[0].farms.id === farm.id;
               })
-              .map(p => ({
-                id: p.id,
-                title: p.title,
-                description: p.description,
-                thumbnail: p.thumbnail,
-                variants: p.product_variant || []
-              }))
+              .map(p => {
+                // Calculate total inventory for this product
+                let totalInventory = 0;
+                if (p.product_variant && Array.isArray(p.product_variant)) {
+                  for (const variant of p.product_variant) {
+                    if (variant.inventory_tracking && Array.isArray(variant.inventory_tracking)) {
+                      totalInventory += variant.inventory_tracking.reduce((sum: number, inv: any) => 
+                        sum + (inv.quantity_available || 0), 0
+                      );
+                    }
+                  }
+                }
+                
+                return {
+                  id: p.id,
+                  title: p.title,
+                  description: p.description,
+                  thumbnail: p.thumbnail,
+                  variants: p.product_variant || [],
+                  totalInventory: totalInventory
+                };
+              })
           });
         }
       } else {

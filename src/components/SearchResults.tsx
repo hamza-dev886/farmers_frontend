@@ -24,48 +24,22 @@ export const SearchResults = ({ searchParams, results, isLoading }: SearchResult
   const { viewMode, setViewMode } = useViewMode();
   const [productInventory, setProductInventory] = useState<Record<string, number>>({});
 
-  // Fetch inventory data for products
+  // Use inventory data from edge function results
   useEffect(() => {
-    const fetchInventory = async () => {
-      if (searchParams.searchType !== 'product' || !results.length) return;
+    if (searchParams.searchType !== 'product' || !results.length) return;
 
-      try {
-        // Extract all variant IDs and product IDs from results
-        const variantIds = results.flatMap(farm => 
-          farm.products?.flatMap((product: any) => 
-            product.variants?.map((variant: any) => variant.id) || []
-          ) || []
-        );
-        
-        // Also collect product IDs for products without variants (fallback)
-        const productIds = results.flatMap(farm => 
-          farm.products?.map((product: any) => product.id) || []
-        );
-        
-        // Combine variant IDs and product IDs for the query
-        const allIds = [...variantIds, ...productIds];
-        
-        if (allIds.length === 0) return;
+    // Create inventory map from the edge function results
+    const inventoryMap: Record<string, number> = {};
+    
+    results.forEach(farm => {
+      farm.products?.forEach((product: any) => {
+        if (product.totalInventory !== undefined) {
+          inventoryMap[product.id] = product.totalInventory;
+        }
+      });
+    });
 
-        const { data, error } = await supabase
-          .from('inventory_tracking')
-          .select('variant_id, quantity_available')
-          .in('variant_id', allIds);
-
-        if (error) throw error;
-
-        const inventoryMap = data?.reduce((acc, item) => {
-          acc[item.variant_id] = item.quantity_available;
-          return acc;
-        }, {} as Record<string, number>) || {};
-
-        setProductInventory(inventoryMap);
-      } catch (error) {
-        console.error('Failed to fetch inventory:', error);
-      }
-    };
-
-    fetchInventory();
+    setProductInventory(inventoryMap);
   }, [searchParams.searchType, results]);
 
   if (!searchParams.searchQuery) {
@@ -142,12 +116,7 @@ export const SearchResults = ({ searchParams, results, isLoading }: SearchResult
                           {farm.distance.toFixed(1)} miles away
                         </span>
                         <span className="text-sm font-medium">
-                          {product.variants && product.variants.length > 0 
-                            ? product.variants.reduce((total: number, variant: any) => 
-                                total + (productInventory[variant.id] || 0), 0
-                              )
-                            : (productInventory[product.id] || 0)
-                          } available
+                          {productInventory[product.id] || 0} available
                         </span>
                       </div>
                     </div>
@@ -179,13 +148,7 @@ export const SearchResults = ({ searchParams, results, isLoading }: SearchResult
                         address: farm.address,
                         distance: farm.distance
                       }}
-                      availableQuantity={
-                        product.variants && product.variants.length > 0 
-                          ? product.variants.reduce((total: number, variant: any) => 
-                              total + (productInventory[variant.id] || 0), 0
-                            )
-                          : (productInventory[product.id] || 0)
-                      }
+                      availableQuantity={productInventory[product.id] || 0}
                     />
                   )) || []
                 )
@@ -230,12 +193,7 @@ export const SearchResults = ({ searchParams, results, isLoading }: SearchResult
                         <p className="text-sm text-muted-foreground mb-2">{farm.name} • {farm.distance.toFixed(1)} miles</p>
                         <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{product.description}</p>
                         <span className="text-xs font-medium text-farm-green">
-                          {product.variants && product.variants.length > 0 
-                            ? product.variants.reduce((total: number, variant: any) => 
-                                total + (productInventory[variant.id] || 0), 0
-                              )
-                            : (productInventory[product.id] || 0)
-                          } available
+                          {productInventory[product.id] || 0} available
                         </span>
                       </div>
                     )) || []
