@@ -59,7 +59,11 @@ Deno.serve(async (req) => {
         product_variant(
           id,
           title,
-          sku
+          sku,
+          price,
+          compare_at_price,
+          weight,
+          inventory_quantity
         ),
         farm_products!inner(
           farm_id,
@@ -82,25 +86,20 @@ Deno.serve(async (req) => {
       throw new Error(`Database error: ${productError.message || 'Unknown database error'}`);
     }
 
-    // Get inventory data separately - check both variant IDs and product IDs
+    // Get inventory data from product_variants table
     const allVariantIds = productResults?.flatMap(product => 
       product.product_variant?.map((variant: any) => variant.id) || []
     ) || [];
     
-    const allProductIds = productResults?.map(product => product.id) || [];
-    
-    // Combine both variant IDs and product IDs for inventory lookup
-    const allInventoryIds = [...allVariantIds, ...allProductIds];
+    let variantInventoryData: any[] = [];
+    if (allVariantIds.length > 0) {
+      const { data: variants, error: variantError } = await supabase
+        .from('product_variants')
+        .select('id, inventory_quantity, price, compare_at_price, weight')
+        .in('id', allVariantIds);
 
-    let inventoryData: any[] = [];
-    if (allInventoryIds.length > 0) {
-      const { data: inventory, error: inventoryError } = await supabase
-        .from('inventory_tracking')
-        .select('variant_id, quantity_available')
-        .in('variant_id', allInventoryIds);
-
-      if (!inventoryError && inventory) {
-        inventoryData = inventory;
+      if (!variantError && variants) {
+        variantInventoryData = variants;
       }
     }
 
@@ -166,22 +165,25 @@ Deno.serve(async (req) => {
                 return fps && fps.length > 0 && fps[0].farms.id === farm.id;
               })
               .map(p => {
-                // Calculate total inventory for this product
+                // Calculate total inventory and get pricing info for this product
                 let totalInventory = 0;
+                let productPrice = null;
+                let compareAtPrice = null;
+                let productWeight = null;
                 
                 if (p.product_variant && Array.isArray(p.product_variant) && p.product_variant.length > 0) {
-                  // Product has variants - sum inventory for all variants
+                  // Product has variants - sum inventory and get pricing from first variant
                   for (const variant of p.product_variant) {
-                    const inventoryRecord = inventoryData.find(inv => inv.variant_id === variant.id);
-                    if (inventoryRecord) {
-                      totalInventory += inventoryRecord.quantity_available || 0;
+                    const variantData = variantInventoryData.find(inv => inv.id === variant.id);
+                    if (variantData) {
+                      totalInventory += variantData.inventory_quantity || 0;
+                      // Use pricing from first variant if not already set
+                      if (productPrice === null) {
+                        productPrice = variantData.price;
+                        compareAtPrice = variantData.compare_at_price;
+                        productWeight = variantData.weight;
+                      }
                     }
-                  }
-                } else {
-                  // Product has no variants - check inventory using product ID directly
-                  const inventoryRecord = inventoryData.find(inv => inv.variant_id === p.id);
-                  if (inventoryRecord) {
-                    totalInventory = inventoryRecord.quantity_available || 0;
                   }
                 }
                 
@@ -190,6 +192,9 @@ Deno.serve(async (req) => {
                   title: p.title,
                   description: p.description,
                   thumbnail: p.thumbnail,
+                  price: productPrice,
+                  compare_at_price: compareAtPrice,
+                  weight: productWeight,
                   variants: p.product_variant || [],
                   totalInventory: totalInventory
                 };

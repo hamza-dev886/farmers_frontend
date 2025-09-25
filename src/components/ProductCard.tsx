@@ -12,6 +12,9 @@ interface ProductCardProps {
     title: string;
     description: string;
     thumbnail: string | null;
+    price?: number;
+    compare_at_price?: number;
+    weight?: number;
   };
   farm: {
     id: string;
@@ -89,6 +92,27 @@ export const ProductCard = ({ product, farm, availableQuantity = 0 }: ProductCar
         <CardDescription className="line-clamp-3 mb-3">
           {product.description}
         </CardDescription>
+        
+        {/* Price and Weight Display */}
+        <div className="space-y-2 mb-3">
+          {product.price && (
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-lg text-primary">
+                ${product.price}
+              </span>
+              {product.compare_at_price && product.compare_at_price > product.price && (
+                <span className="text-sm text-muted-foreground line-through">
+                  ${product.compare_at_price}
+                </span>
+              )}
+            </div>
+          )}
+          {product.weight && (
+            <div className="text-sm text-muted-foreground">
+              Weight: {product.weight} kg
+            </div>
+          )}
+        </div>
         
         <div className="flex items-center justify-between">
           <Badge variant={stockStatus.variant}>
