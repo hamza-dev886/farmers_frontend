@@ -141,10 +141,10 @@ const FarmerDashboard = () => {
       }
 
       setIsFarmer(true);
-      await fetchFarmData();
+      await fetchCurrentPlan(session.user);
+      await fetchFarmData(session.user);
       await fetchProducts();
       await fetchInventory();
-      await fetchCurrentPlan();
     } catch (error) {
       console.error('Error checking auth:', error);
       navigate('/');
@@ -153,14 +153,15 @@ const FarmerDashboard = () => {
     }
   };
 
-  const fetchFarmData = async () => {
-    if (!user) return;
+  const fetchFarmData = async (currentUser?: any) => {
+    const userId = currentUser?.id || user?.id;
+    if (!userId) return;
     
     try {
       const { data, error } = await supabase
         .from('farms')
         .select('*')
-        .eq('farmer_id', user.id)
+        .eq('farmer_id', userId)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
@@ -245,8 +246,9 @@ const FarmerDashboard = () => {
     }
   };
 
-  const fetchCurrentPlan = async () => {
-    if (!user) return;
+  const fetchCurrentPlan = async (currentUser?: any) => {
+    const userId = currentUser?.id || user?.id;
+    if (!userId) return;
 
     try {
       const { data, error } = await supabase
@@ -261,7 +263,7 @@ const FarmerDashboard = () => {
             transaction_fee
           )
         `)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('is_active', true)
         .single();
 
@@ -395,8 +397,9 @@ const FarmerDashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="farm">My Farm</TabsTrigger>
             <TabsTrigger value="products">Products</TabsTrigger>
             <TabsTrigger value="inventory">Inventory</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -485,6 +488,95 @@ const FarmerDashboard = () => {
             </div>
           </TabsContent>
 
+          {/* Farm Tab */}
+          <TabsContent value="farm">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>My Farm</CardTitle>
+                  <CardDescription>Complete farm information and management</CardDescription>
+                </div>
+                <Button onClick={handleEditFarm} disabled={!farmData}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Farm
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {farmData ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Basic Information</h3>
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Farm Name</p>
+                            <p className="text-lg">{farmData.name}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Contact Person</p>
+                            <p>{farmData.contact_person}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Email</p>
+                            <p>{farmData.email}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Phone</p>
+                            <p>{farmData.phone || 'Not provided'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Location & Description</h3>
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Address</p>
+                            <p>{farmData.address}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Farm Bio</p>
+                            <p className="text-sm">{farmData.bio || 'No description available'}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Created</p>
+                            <p>{new Date(farmData.created_at).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Plan Limits</h3>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm">Products Used:</span>
+                            <span className="text-sm font-medium">
+                              {stats.totalProducts} / {currentPlan?.max_products === 0 ? '∞' : currentPlan?.max_products || 0}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-sm">Transaction Fee:</span>
+                            <span className="text-sm font-medium">{currentPlan?.transaction_fee || 0}%</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Wheat className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No Farm Information</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Your farm profile hasn't been set up yet. Contact support to complete your farm setup.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* Products Tab */}
           <TabsContent value="products">
             <Card>
@@ -493,7 +585,10 @@ const FarmerDashboard = () => {
                   <CardTitle>Products</CardTitle>
                   <CardDescription>Manage your farm products and listings</CardDescription>
                 </div>
-                <Button onClick={() => setProductModalOpen(true)}>
+                <Button 
+                  onClick={() => setProductModalOpen(true)}
+                  disabled={currentPlan?.max_products !== 0 && stats.totalProducts >= (currentPlan?.max_products || 0)}
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Product
                 </Button>
@@ -542,6 +637,19 @@ const FarmerDashboard = () => {
                 {products.length === 0 && (
                   <div className="text-center py-8">
                     <p className="text-muted-foreground">No products found. Add your first product!</p>
+                    {currentPlan?.max_products !== 0 && (
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Your current plan allows up to {currentPlan?.max_products || 0} products.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {currentPlan?.max_products !== 0 && stats.totalProducts >= (currentPlan?.max_products || 0) && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
+                    <p className="text-sm text-yellow-800">
+                      You've reached your plan limit of {currentPlan?.max_products} products. 
+                      Upgrade your plan to add more products.
+                    </p>
                   </div>
                 )}
               </CardContent>
