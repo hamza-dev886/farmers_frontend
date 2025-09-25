@@ -223,7 +223,12 @@ export const Header = () => {
         <div className="flex items-center gap-2">
           {/* Cart Icon - Only show for non-admin/farmer users */}
           {userProfile?.role !== 'admin' && userProfile?.role !== 'farmer' && (
-            <Button variant="ghost" size="icon" className="relative">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="relative"
+              onClick={() => navigate('/cart')}
+            >
               <ShoppingCart className="h-5 w-5" />
               {getTotalItems() > 0 && (
                 <Badge 
