@@ -66,7 +66,23 @@ export const ProductCard = ({ product, farm, availableQuantity = 0 }: ProductCar
   const stockStatus = getStockStatus();
 
   return (
-    <Card className="h-full flex flex-col hover:shadow-lg transition-shadow">
+    <Card className="h-full flex flex-col hover:shadow-lg transition-shadow relative">
+      {/* Price in top right corner */}
+      {product.price && (
+        <div className="absolute top-3 right-3 z-10 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1 shadow-sm">
+          <div className="text-right">
+            <span className="text-xl font-bold text-primary">
+              ${product.price}
+            </span>
+            {product.compare_at_price && product.compare_at_price > product.price && (
+              <div className="text-sm text-muted-foreground line-through">
+                ${product.compare_at_price}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
       <CardHeader className="pb-3">
         {product.thumbnail && (
           <div className="aspect-square rounded-md overflow-hidden mb-3">
@@ -93,26 +109,12 @@ export const ProductCard = ({ product, farm, availableQuantity = 0 }: ProductCar
           {product.description}
         </CardDescription>
         
-        {/* Price and Weight Display */}
-        <div className="space-y-2 mb-3">
-          {product.price && (
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-lg text-primary">
-                ${product.price}
-              </span>
-              {product.compare_at_price && product.compare_at_price > product.price && (
-                <span className="text-sm text-muted-foreground line-through">
-                  ${product.compare_at_price}
-                </span>
-              )}
-            </div>
-          )}
-          {product.weight && (
-            <div className="text-sm text-muted-foreground">
-              Weight: {product.weight} kg
-            </div>
-          )}
-        </div>
+        {/* Weight Display */}
+        {product.weight && (
+          <div className="text-sm text-muted-foreground mb-3">
+            Weight: {product.weight} kg
+          </div>
+        )}
         
         <div className="flex items-center justify-between">
           <Badge variant={stockStatus.variant}>
