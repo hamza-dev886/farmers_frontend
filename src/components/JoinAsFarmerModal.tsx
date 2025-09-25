@@ -87,6 +87,15 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
       const tempPassword = generatePassword();
 
       // Create user account with temporary password using regular signup
+      console.log('Attempting signup with email:', data.email);
+      console.log('Email validation passed client-side');
+      
+      // Try to validate email format more strictly before sending to Supabase
+      const strictEmailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+      if (!strictEmailRegex.test(data.email)) {
+        throw new Error("Please use a different email address format");
+      }
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
         password: tempPassword,
@@ -99,6 +108,8 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
           }
         }
       });
+
+      console.log('Supabase signup response:', { authData, authError });
 
       if (authError) throw authError;
 
@@ -138,8 +149,8 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
       let errorMessage = "There was an issue submitting your application. Please try again.";
       
       // Handle specific email validation errors
-      if (error.message?.includes("email_address_invalid") || error.message?.includes("Email address") && error.message?.includes("invalid")) {
-        errorMessage = "The email address you entered is invalid. Please check the format and try again.";
+      if (error.message?.includes("email_address_invalid") || (error.message?.includes("Email address") && error.message?.includes("invalid"))) {
+        errorMessage = "The email address you entered appears to be invalid or blocked by our system. Please try using a different email address (Gmail, Yahoo, Outlook, etc.) or contact support if you believe this is an error.";
       } else if (error.message?.includes("email_rate_limit_exceeded")) {
         errorMessage = "Too many signup attempts. Please wait a few minutes before trying again.";
       } else if (error.message?.includes("signup_disabled")) {
