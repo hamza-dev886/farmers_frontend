@@ -147,9 +147,24 @@ const Index = () => {
         
         const beforeDistance = filteredResults.length;
         filteredResults = filteredResults.filter(farm => {
-          // For farms without coordinates, exclude them from distance-based searches
+          // For farms without coordinates, include them if they're in a reasonable distance based on address
           if (!farm.location || !farm.location.lat || !farm.location.lng) {
-            console.log('Farm without coordinates excluded:', farm.name);
+            console.log('Farm without coordinates - checking by address:', farm.name, farm.address);
+            
+            // Simple text-based location matching for farms without coordinates
+            // If the farm address contains "Brooklyn" and user searched in Brooklyn area, include it
+            const farmAddress = farm.address.toLowerCase();
+            const [userLng, userLat] = params.coordinates;
+            
+            // Brooklyn coordinates are roughly around -73.9, 40.6
+            // If user is searching in Brooklyn area (within these bounds) and farm is in Brooklyn, include it
+            if (userLng > -74.1 && userLng < -73.8 && userLat > 40.5 && userLat < 40.8) {
+              if (farmAddress.includes('brooklyn') || farmAddress.includes('new york')) {
+                console.log('Farm in Brooklyn area included:', farm.name);
+                return true;
+              }
+            }
+            
             return false;
           }
           
