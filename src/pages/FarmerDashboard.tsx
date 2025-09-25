@@ -456,11 +456,9 @@ const FarmerDashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="farm">My Farm</TabsTrigger>
-            <TabsTrigger value="products">Products</TabsTrigger>
-            <TabsTrigger value="inventory">Inventory</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
           
@@ -568,6 +566,10 @@ const FarmerDashboard = () => {
                         Add Farm
                       </Button>
                     )}
+                    <Button onClick={() => navigate(`/farm/${selectedFarm?.id}`)} disabled={!selectedFarm}>
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Farm
+                    </Button>
                     <Button onClick={handleEditFarm} disabled={!selectedFarm} variant="outline">
                       <Edit className="h-4 w-4 mr-2" />
                       Edit Farm
@@ -693,145 +695,6 @@ const FarmerDashboard = () => {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-
-          {/* Products Tab */}
-          <TabsContent value="products">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Products</CardTitle>
-                  <CardDescription>Manage your farm products and listings</CardDescription>
-                </div>
-                <Button 
-                  onClick={() => setProductModalOpen(true)}
-                  disabled={currentPlan?.max_products !== 0 && stats.totalProducts >= (currentPlan?.max_products || 0)}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Product
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product Name</TableHead>
-                      <TableHead>Handle</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {products.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell className="font-medium">{product.title}</TableCell>
-                        <TableCell>{product.handle}</TableCell>
-                        <TableCell>
-                          <Badge variant={product.status === 'published' ? 'default' : 'secondary'}>
-                            {product.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {new Date(product.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="destructive" size="sm">
-                              <Trash className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {products.length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">No products found. Add your first product!</p>
-                    {currentPlan?.max_products !== 0 && (
-                      <p className="text-sm text-muted-foreground mt-2">
-                        Your current plan allows up to {currentPlan?.max_products || 0} products.
-                      </p>
-                    )}
-                  </div>
-                )}
-                {currentPlan?.max_products !== 0 && stats.totalProducts >= (currentPlan?.max_products || 0) && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
-                    <p className="text-sm text-yellow-800">
-                      You've reached your plan limit of {currentPlan?.max_products} products. 
-                      Upgrade your plan to add more products.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Inventory Tab */}
-          <TabsContent value="inventory">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Inventory Management</CardTitle>
-                  <CardDescription>Track your product inventory and stock levels</CardDescription>
-                </div>
-                <Button onClick={() => setInventoryModalOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Inventory
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Available</TableHead>
-                      <TableHead>Reserved</TableHead>
-                      <TableHead>Low Stock Alert</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {inventory.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.location || 'Main Storage'}</TableCell>
-                        <TableCell>{item.quantity_available}</TableCell>
-                        <TableCell>{item.quantity_reserved}</TableCell>
-                        <TableCell>{item.low_stock_threshold}</TableCell>
-                        <TableCell>
-                          <Badge variant={item.quantity_available <= item.low_stock_threshold ? 'destructive' : 'default'}>
-                            {item.quantity_available <= item.low_stock_threshold ? 'Low Stock' : 'In Stock'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="destructive" size="sm">
-                              <Trash className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {inventory.length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">No inventory items found.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* Settings Tab */}
