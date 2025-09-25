@@ -28,7 +28,8 @@ export default function Checkout() {
     address: "",
     city: "",
     postalCode: "",
-    deliveryNotes: ""
+    deliveryNotes: "",
+    pickupTime: ""
   });
 
   // Check authentication status
@@ -74,8 +75,7 @@ export default function Checkout() {
     }
   }, [items, navigate]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+  const handleInputChange = (name: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -93,22 +93,39 @@ export default function Checkout() {
     setIsProcessing(true);
 
     try {
-      // TODO: Implement actual order processing
-      // This would typically involve:
-      // 1. Creating an order record in the database
-      // 2. Processing payment
-      // 3. Sending confirmation emails
-      // 4. Updating inventory
+      // Create order in Supabase
+      const orderData = {
+        customer_id: user.id,
+        email: user.email || formData.email,
+        currency_code: 'USD',
+        region_id: 'us',
+        sales_channel_id: 'organic',
+        delivery_notes: formData.deliveryNotes || null,
+        pickup_time: formData.pickupTime ? new Date(formData.pickupTime).toISOString() : null,
+        status: 'pending',
+        metadata: {
+          customer_name: formData.firstName + ' ' + formData.lastName,
+          phone: formData.phone,
+          delivery_address: formData.address + ', ' + formData.city + ', ' + formData.postalCode,
+          total_items: getTotalItems(),
+          cart_items: items
+        }
+      };
 
-      // Simulate processing delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const { data: order, error: orderError } = await supabase
+        .from('order')
+        .insert(orderData as any)
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
 
       clearCart();
       toast.success("Order placed successfully! You will receive a confirmation email shortly.");
       navigate('/');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Checkout error:', error);
-      toast.error("Failed to process order. Please try again.");
+      toast.error(error.message || "Failed to process order. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -185,7 +202,7 @@ export default function Checkout() {
                         id="firstName"
                         name="firstName"
                         value={formData.firstName}
-                        onChange={handleInputChange}
+                        onChange={(e) => handleInputChange('firstName', e.target.value)}
                         required
                       />
                     </div>
@@ -195,7 +212,7 @@ export default function Checkout() {
                         id="lastName"
                         name="lastName"
                         value={formData.lastName}
-                        onChange={handleInputChange}
+                        onChange={(e) => handleInputChange('lastName', e.target.value)}
                         required
                       />
                     </div>
@@ -207,7 +224,7 @@ export default function Checkout() {
                       name="email"
                       type="email"
                       value={formData.email}
-                      onChange={handleInputChange}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
                       required
                     />
                   </div>
@@ -218,7 +235,7 @@ export default function Checkout() {
                       name="phone"
                       type="tel"
                       value={formData.phone}
-                      onChange={handleInputChange}
+                      onChange={(e) => handleInputChange('phone', e.target.value)}
                       required
                     />
                   </div>
@@ -240,7 +257,7 @@ export default function Checkout() {
                       id="address"
                       name="address"
                       value={formData.address}
-                      onChange={handleInputChange}
+                      onChange={(e) => handleInputChange('address', e.target.value)}
                       required
                     />
                   </div>
@@ -251,7 +268,7 @@ export default function Checkout() {
                         id="city"
                         name="city"
                         value={formData.city}
-                        onChange={handleInputChange}
+                        onChange={(e) => handleInputChange('city', e.target.value)}
                         required
                       />
                     </div>
@@ -261,7 +278,7 @@ export default function Checkout() {
                         id="postalCode"
                         name="postalCode"
                         value={formData.postalCode}
-                        onChange={handleInputChange}
+                        onChange={(e) => handleInputChange('postalCode', e.target.value)}
                         required
                       />
                     </div>
@@ -272,10 +289,20 @@ export default function Checkout() {
                       id="deliveryNotes"
                       name="deliveryNotes"
                       value={formData.deliveryNotes}
-                      onChange={handleInputChange}
+                      onChange={(e) => handleInputChange('deliveryNotes', e.target.value)}
                       placeholder="Any special delivery instructions..."
                       className="resize-none"
                       rows={3}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="pickupTime">Pickup Time (Optional)</Label>
+                    <Input
+                      id="pickupTime"
+                      name="pickupTime"
+                      type="datetime-local"
+                      value={formData.pickupTime}
+                      onChange={(e) => handleInputChange('pickupTime', e.target.value)}
                     />
                   </div>
                 </CardContent>

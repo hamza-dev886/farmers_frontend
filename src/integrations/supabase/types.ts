@@ -2160,12 +2160,14 @@ export type Database = {
           currency_code: string
           customer_id: string | null
           deleted_at: string | null
+          delivery_notes: string | null
           display_id: number | null
           email: string | null
           id: string
           is_draft_order: boolean
           metadata: Json | null
           no_notification: boolean | null
+          pickup_time: string | null
           region_id: string | null
           sales_channel_id: string | null
           shipping_address_id: string | null
@@ -2180,12 +2182,14 @@ export type Database = {
           currency_code: string
           customer_id?: string | null
           deleted_at?: string | null
+          delivery_notes?: string | null
           display_id?: number | null
           email?: string | null
           id: string
           is_draft_order?: boolean
           metadata?: Json | null
           no_notification?: boolean | null
+          pickup_time?: string | null
           region_id?: string | null
           sales_channel_id?: string | null
           shipping_address_id?: string | null
@@ -2200,12 +2204,14 @@ export type Database = {
           currency_code?: string
           customer_id?: string | null
           deleted_at?: string | null
+          delivery_notes?: string | null
           display_id?: number | null
           email?: string | null
           id?: string
           is_draft_order?: boolean
           metadata?: Json | null
           no_notification?: boolean | null
+          pickup_time?: string | null
           region_id?: string | null
           sales_channel_id?: string | null
           shipping_address_id?: string | null
