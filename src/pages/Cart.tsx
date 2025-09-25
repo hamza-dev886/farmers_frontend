@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/contexts/CartContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { Header } from "@/components/Header";
 
 export default function Cart() {
   const { items, updateQuantity, removeFromCart, clearCart, getTotalItems } = useCart();
@@ -43,7 +44,9 @@ export default function Cart() {
 
   if (items.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <>
+        <Header />
+        <div className="container mx-auto px-4 py-8">
         <div className="flex items-center gap-4 mb-6">
           <Button
             variant="ghost"
@@ -72,12 +75,15 @@ export default function Cart() {
             </div>
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <>
+      <Header />
+      <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Button
@@ -205,6 +211,7 @@ export default function Cart() {
           </Card>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
