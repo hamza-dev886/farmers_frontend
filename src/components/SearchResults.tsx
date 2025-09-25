@@ -92,13 +92,24 @@ export const SearchResults = ({ searchParams, results, isLoading }: SearchResult
 
           {viewMode === 'grid' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {results.map((item, index) => (
-                searchParams.searchType === 'farm' ? (
-                  <FarmCard key={index} {...item} />
-                ) : (
-                  <PropertyCard key={index} {...item} />
-                )
-              ))}
+              {results.map((item, index) => {
+                if (searchParams.searchType === 'farm') {
+                  return <FarmCard key={index} {...item} />;
+                } else {
+                  // Transform farm data to PropertyCard format
+                  const propertyData = {
+                    id: item.id,
+                    title: item.name || 'Farm',
+                    type: 'farm' as const,
+                    location: item.address || 'Unknown location',
+                    image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400&h=300&fit=crop',
+                    size: 'Family Farm',
+                    description: item.bio || 'Local farm producing fresh products',
+                    features: ['Fresh Produce', 'Local Farm']
+                  };
+                  return <PropertyCard key={index} {...propertyData} />;
+                }
+              })}
             </div>
           )}
 
