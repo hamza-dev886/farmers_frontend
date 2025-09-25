@@ -80,13 +80,74 @@ const Index = () => {
     setIsSearching(true);
     
     try {
-      // Mock search logic - replace with actual search implementation
-      const mockResults = farms.filter(farm => 
-        farm.name.toLowerCase().includes(params.searchQuery.toLowerCase()) ||
-        farm.address.toLowerCase().includes(params.searchQuery.toLowerCase())
-      );
+      let filteredResults = [...farms];
       
-      setSearchResults(mockResults);
+      // Filter by search type and query
+      if (params.searchType === 'product') {
+        // For product searches, match against common farm products
+        const productKeywords = params.searchQuery.toLowerCase();
+        const farmProductMap = {
+          'duck': ['poultry', 'meat', 'farm'],
+          'chicken': ['poultry', 'meat', 'farm'],
+          'egg': ['poultry', 'farm'],
+          'tomato': ['vegetable', 'produce', 'farm'],
+          'vegetable': ['produce', 'farm', 'organic'],
+          'fruit': ['produce', 'farm', 'organic'],
+          'organic': ['organic', 'farm'],
+          'fresh': ['produce', 'farm'],
+          'meat': ['poultry', 'meat', 'farm']
+        };
+        
+        filteredResults = farms.filter(farm => {
+          const farmText = `${farm.name} ${farm.bio || ''} ${farm.address}`.toLowerCase();
+          
+          // Direct keyword match
+          if (farmText.includes(productKeywords)) return true;
+          
+          // Check if farm might sell this product based on keywords
+          const relevantKeywords = farmProductMap[productKeywords] || [productKeywords];
+          return relevantKeywords.some(keyword => farmText.includes(keyword));
+        });
+      } else if (params.searchType === 'farm') {
+        // Search farm names and descriptions
+        filteredResults = farms.filter(farm => 
+          farm.name.toLowerCase().includes(params.searchQuery.toLowerCase()) ||
+          (farm.bio && farm.bio.toLowerCase().includes(params.searchQuery.toLowerCase())) ||
+          farm.address.toLowerCase().includes(params.searchQuery.toLowerCase())
+        );
+      } else if (params.searchType === 'event') {
+        // For now, return farms that might host events
+        filteredResults = farms.filter(farm => 
+          (farm.bio && farm.bio.toLowerCase().includes('event')) ||
+          (farm.bio && farm.bio.toLowerCase().includes('workshop')) ||
+          (farm.bio && farm.bio.toLowerCase().includes('visit'))
+        );
+      }
+      
+      // Apply distance filtering (basic implementation)
+      // Note: This is a simplified distance calculation for demo purposes
+      if (params.coordinates && params.maxDistance) {
+        const maxDistanceKm = parseFloat(params.maxDistance) * 1.60934; // Convert miles to km
+        
+        filteredResults = filteredResults.filter(farm => {
+          // For farms without coordinates, include them for now (they'll get random coords on map)
+          if (!farm.location || !farm.location.lat) return true;
+          
+          // Simple distance calculation (not perfectly accurate but good enough for demo)
+          const farmLat = farm.location.lat;
+          const farmLng = farm.location.lng;
+          const userLat = params.coordinates[0];
+          const userLng = params.coordinates[1];
+          
+          const distance = Math.sqrt(
+            Math.pow(farmLat - userLat, 2) + Math.pow(farmLng - userLng, 2)
+          ) * 111; // Rough conversion to km
+          
+          return distance <= maxDistanceKm;
+        });
+      }
+      
+      setSearchResults(filteredResults);
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
