@@ -5,8 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ViewModeProvider } from "@/hooks/useViewMode";
 import Index from "./pages/Index";
-import Cart from "./pages/Cart";
-import Checkout from "./pages/Checkout";
 import FarmerProfile from "./pages/FarmerProfile";
 import FarmerDashboard from "./pages/FarmerDashboard";
 import FarmDashboard from "./pages/FarmDashboard";
@@ -25,8 +23,6 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/cart" element={<Cart />} />
-            <Route path="/checkout" element={<Checkout />} />
             <Route path="/farmer/:farmId" element={<FarmerProfile />} />
             <Route path="/farmer-dashboard" element={<FarmerDashboard />} />
             <Route path="/farm/:farmId" element={<FarmDashboard />} />

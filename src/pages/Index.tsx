@@ -15,7 +15,6 @@ import { useViewMode } from "@/hooks/useViewMode";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { SearchResults } from "@/components/SearchResults";
 
 interface Farm {
   id: string;
@@ -33,9 +32,6 @@ interface Farm {
 const Index = () => {
   const { viewMode, setViewMode } = useViewMode();
   const [showFilters, setShowFilters] = useState(false);
-  const [searchParams, setSearchParams] = useState<any>(null);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
 
@@ -75,102 +71,149 @@ const Index = () => {
     }
   });
 
-  const handleSearch = async (params: any) => {
-    setSearchParams(params);
-    setIsSearching(true);
-    
-    console.log('Search params:', params);
-    
-    try {
-      if (params.searchType === 'product') {
-        // Use edge function for product search with distance calculation
-        console.log('Calling product search edge function...');
-        
-        const { data, error } = await supabase.functions.invoke('product-search', {
-          body: {
-            searchQuery: params.searchQuery,
-            userLocation: params.coordinates,
-            maxDistance: params.maxDistance
-          }
-        });
-        
-        if (error) {
-          console.error('Product search error:', error);
-          setSearchResults([]);
-        } else {
-          console.log('Product search results:', data);
-          setSearchResults(data.results || []);
-        }
-      } else {
-        // For farm and event searches, use the existing logic
-        let filteredResults = [...farms];
-        
-        if (params.searchType === 'farm') {
-          filteredResults = farms.filter(farm => 
-            farm.name.toLowerCase().includes(params.searchQuery.toLowerCase()) ||
-            (farm.bio && farm.bio.toLowerCase().includes(params.searchQuery.toLowerCase())) ||
-            farm.address.toLowerCase().includes(params.searchQuery.toLowerCase())
-          );
-        } else if (params.searchType === 'event') {
-          filteredResults = farms.filter(farm => 
-            (farm.bio && farm.bio.toLowerCase().includes('event')) ||
-            (farm.bio && farm.bio.toLowerCase().includes('workshop')) ||
-            (farm.bio && farm.bio.toLowerCase().includes('visit'))
-          );
-        }
-        
-        // Apply distance filtering for farm/event searches
-        if (params.coordinates && params.maxDistance) {
-          console.log('Applying distance filter:', params.maxDistance, 'miles from', params.coordinates);
-          const maxDistanceKm = parseFloat(params.maxDistance) * 1.60934;
-          
-          filteredResults = filteredResults.filter(farm => {
-            if (!farm.location || !farm.location.lat || !farm.location.lng) {
-              const farmAddress = farm.address.toLowerCase();
-              const [userLng, userLat] = params.coordinates;
-              
-              if (userLng > -74.1 && userLng < -73.8 && userLat > 40.5 && userLat < 40.8) {
-                if (farmAddress.includes('brooklyn') || farmAddress.includes('new york')) {
-                  return true;
-                }
-              }
-              return false;
-            }
-            
-            const farmLat = farm.location.lat;
-            const farmLng = farm.location.lng;
-            const userLat = params.coordinates[1];
-            const userLng = params.coordinates[0];
-            
-            const distance = Math.sqrt(
-              Math.pow(farmLat - userLat, 2) + Math.pow(farmLng - userLng, 2)
-            ) * 111;
-            
-            return distance <= maxDistanceKm;
-          });
-        }
-        
-        setSearchResults(filteredResults);
-      }
-    } catch (error) {
-      console.error('Search error:', error);
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <Hero onSearch={handleSearch} />
-      {searchParams && (
-        <SearchResults 
-          searchParams={searchParams}
-          results={searchResults}
-          isLoading={isSearching}
-        />
-      )}
+      <Hero />
+      
+      <main className="container mx-auto px-4 py-8">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Desktop Filters Sidebar - Always visible */}
+          <aside className="hidden lg:block w-64 xl:w-72 flex-shrink-0">
+            <div className="sticky top-24">
+              <FilterSidebar />
+            </div>
+          </aside>
+          
+          {/* Mobile Filters Sheet */}
+          <Sheet open={showFilters && isMobile} onOpenChange={(open) => !open && setShowFilters(false)}>
+            <SheetContent side="left" className="w-80 p-0">
+              <div className="p-4">
+                <FilterSidebar />
+              </div>
+            </SheetContent>
+          </Sheet>
+          
+          {/* Main Content */}
+          <div className="flex-1">
+            {/* View Controls */}
+            <div className="bg-card rounded-lg border p-4 mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                   <h2 className="text-2xl font-bold text-foreground">
+                     {isLoading ? 'Loading...' : `${farms.length + mockProperties.length} Farm Listings`}
+                   </h2>
+                   <p className="text-muted-foreground">
+                     {farms.length} Farms and {mockProperties.length} Farm stalls in your area
+                   </p>
+                </div>
+                
+                 <div className="flex items-center gap-2">
+                   {/* Only show filter button on mobile */}
+                   {isMobile && (
+                     <Button
+                       variant={showFilters ? "default" : "outline"}
+                       size="sm"
+                       onClick={() => setShowFilters(!showFilters)}
+                       className="flex items-center gap-2"
+                     >
+                       <Filter className="w-4 h-4" />
+                       Filters
+                     </Button>
+                   )}
+                   
+                   <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                     <button
+                       className={`flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                         viewMode === "grid" 
+                           ? "bg-farm-green text-white shadow-sm" 
+                           : "text-muted-foreground hover:text-foreground hover:bg-background"
+                       }`}
+                       onClick={() => {
+                         console.log("Grid button clicked - switching to grid view");
+                         setViewMode("grid");
+                       }}
+                     >
+                       <Grid className="w-4 h-4 mr-1" />
+                       Grid
+                     </button>
+                     <button
+                       className={`flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                         viewMode === "list" 
+                           ? "bg-farm-green text-white shadow-sm" 
+                           : "text-muted-foreground hover:text-foreground hover:bg-background"
+                       }`}
+                       onClick={() => {
+                         console.log("List button clicked - switching to list view");
+                         setViewMode("list");
+                       }}
+                     >
+                       <List className="w-4 h-4 mr-1" />
+                       List
+                     </button>
+                     <button
+                       className={`flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                         viewMode === "map" 
+                           ? "bg-farm-green text-white shadow-sm" 
+                           : "text-muted-foreground hover:text-foreground hover:bg-background"
+                       }`}
+                       onClick={() => {
+                         console.log("Map button clicked - switching to map view");
+                         setViewMode("map");
+                       }}
+                     >
+                       <Map className="w-4 h-4 mr-1" />
+                       Map
+                     </button>
+                   </div>
+                 </div>
+               </div>
+             </div>
+            
+            {/* Content based on view mode */}
+            {viewMode === "map" ? (
+              <div className="relative">
+                <MapView />
+              </div>
+            ) : isLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farm-green mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading farms...</p>
+                </div>
+              </div>
+            ) : (
+              <div className={
+                viewMode === "grid" 
+                  ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" 
+                  : "space-y-4"
+              }>
+                {/* Real Farms from Supabase */}
+                {farms.map((farm) => (
+                  <FarmCard
+                    key={farm.id}
+                    id={farm.id}
+                    name={farm.name}
+                    address={farm.address}
+                    bio={farm.bio}
+                    contact_person={farm.contact_person}
+                    email={farm.email}
+                    phone={farm.phone}
+                  />
+                ))}
+                
+                {/* Mock Properties (Farm stalls) */}
+                {mockProperties.map((property) => (
+                  <PropertyCard
+                    key={property.id}
+                    {...property}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
     </div>
   );
 };

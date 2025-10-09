@@ -21,13 +21,7 @@ interface Farm {
   location?: any; // JSON field from Supabase
 }
 
-interface MapViewProps {
-  searchResults?: any[];
-  searchType?: string;
-  userLocation?: [number, number] | null;
-}
-
-export const MapView = ({ searchResults, searchType, userLocation }: MapViewProps) => {
+export const MapView = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string>('');
@@ -58,8 +52,8 @@ export const MapView = ({ searchResults, searchType, userLocation }: MapViewProp
     }
   }, [configData]);
 
-  // Use search results if provided, otherwise fetch all farms
-  const { data: allFarms = [], isLoading } = useQuery({
+  // Fetch farms from Supabase
+  const { data: farms = [], isLoading } = useQuery({
     queryKey: ['farms'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -68,12 +62,8 @@ export const MapView = ({ searchResults, searchType, userLocation }: MapViewProp
       
       if (error) throw error;
       return data as Farm[];
-    },
-    enabled: !searchResults // Only fetch if no search results provided
+    }
   });
-
-  // Use search results or all farms
-  const farms = searchResults || allFarms;
 
   const initializeMap = (token: string) => {
     if (!mapContainer.current || map.current) return;
@@ -129,27 +119,10 @@ export const MapView = ({ searchResults, searchType, userLocation }: MapViewProp
   const addFarmMarkers = () => {
     if (!map.current || !farms.length) return;
 
-    // Clear existing markers before adding new ones
-    const existingMarkers = document.querySelectorAll('.farm-marker');
-    existingMarkers.forEach(marker => marker.remove());
-
     farms.forEach((farm) => {
-      // Handle different coordinate sources based on search type
-      let lat, lng;
-      
-      if (searchType === 'product' && farm.farm_location) {
-        // If searching for products, use the related farm's location
-        lat = farm.farm_location.lat;
-        lng = farm.farm_location.lng;
-      } else if (farm.location) {
-        // Use farm's own location
-        lat = farm.location.lat || farm.location.latitude;
-        lng = farm.location.lng || farm.location.longitude;
-      } else {
-        // Fallback to random coordinates in US
-        lat = 39.8283 + (Math.random() - 0.5) * 20;
-        lng = -98.5795 + (Math.random() - 0.5) * 40;
-      }
+      // Use location from database or fallback to random coordinates
+      const lat = farm.location?.lat || (39.8283 + (Math.random() - 0.5) * 20);
+      const lng = farm.location?.lng || (-98.5795 + (Math.random() - 0.5) * 40);
 
       // Create custom marker element
       const markerElement = document.createElement('div');
@@ -201,28 +174,6 @@ export const MapView = ({ searchResults, searchType, userLocation }: MapViewProp
         .setPopup(popup)
         .addTo(map.current!);
     });
-
-    // If user location is provided, add a marker for it
-    if (userLocation && map.current) {
-      const userMarker = document.createElement('div');
-      userMarker.innerHTML = `
-        <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-            <circle cx="12" cy="12" r="10"/>
-          </svg>
-        </div>
-      `;
-      
-      new mapboxgl.Marker(userMarker)
-        .setLngLat([userLocation[1], userLocation[0]])
-        .addTo(map.current);
-        
-      // Center map on user location
-      map.current.flyTo({
-        center: [userLocation[1], userLocation[0]],
-        zoom: 10
-      });
-    }
   };
 
   useEffect(() => {
@@ -246,7 +197,7 @@ export const MapView = ({ searchResults, searchType, userLocation }: MapViewProp
     if (map.current && farms.length > 0) {
       addFarmMarkers();
     }
-  }, [farms, userLocation, searchType]);
+  }, [farms]);
 
   const handleTokenSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,7 +208,7 @@ export const MapView = ({ searchResults, searchType, userLocation }: MapViewProp
     }
   };
 
-  if (isLoading && !searchResults) {
+  if (isLoading) {
     return (
       <div className="relative w-full h-[600px] bg-gradient-subtle rounded-lg border border-border overflow-hidden flex items-center justify-center">
         <div className="text-center">

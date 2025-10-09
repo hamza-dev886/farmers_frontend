@@ -1865,6 +1865,63 @@ export type Database = {
           },
         ]
       }
+      inventory_tracking: {
+        Row: {
+          created_at: string
+          farm_id: string
+          id: string
+          last_updated_by: string | null
+          location: string | null
+          low_stock_threshold: number | null
+          notes: string | null
+          quantity_available: number
+          quantity_reserved: number
+          updated_at: string
+          variant_id: string
+        }
+        Insert: {
+          created_at?: string
+          farm_id: string
+          id?: string
+          last_updated_by?: string | null
+          location?: string | null
+          low_stock_threshold?: number | null
+          notes?: string | null
+          quantity_available?: number
+          quantity_reserved?: number
+          updated_at?: string
+          variant_id: string
+        }
+        Update: {
+          created_at?: string
+          farm_id?: string
+          id?: string
+          last_updated_by?: string | null
+          location?: string | null
+          low_stock_threshold?: number | null
+          notes?: string | null
+          quantity_available?: number
+          quantity_reserved?: number
+          updated_at?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_tracking_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_tracking_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invite: {
         Row: {
           accepted: boolean
@@ -2103,14 +2160,12 @@ export type Database = {
           currency_code: string
           customer_id: string | null
           deleted_at: string | null
-          delivery_notes: string | null
           display_id: number | null
           email: string | null
           id: string
           is_draft_order: boolean
           metadata: Json | null
           no_notification: boolean | null
-          pickup_time: string | null
           region_id: string | null
           sales_channel_id: string | null
           shipping_address_id: string | null
@@ -2125,14 +2180,12 @@ export type Database = {
           currency_code: string
           customer_id?: string | null
           deleted_at?: string | null
-          delivery_notes?: string | null
           display_id?: number | null
           email?: string | null
-          id?: string
+          id: string
           is_draft_order?: boolean
           metadata?: Json | null
           no_notification?: boolean | null
-          pickup_time?: string | null
           region_id?: string | null
           sales_channel_id?: string | null
           shipping_address_id?: string | null
@@ -2147,14 +2200,12 @@ export type Database = {
           currency_code?: string
           customer_id?: string | null
           deleted_at?: string | null
-          delivery_notes?: string | null
           display_id?: number | null
           email?: string | null
           id?: string
           is_draft_order?: boolean
           metadata?: Json | null
           no_notification?: boolean | null
-          pickup_time?: string | null
           region_id?: string | null
           sales_channel_id?: string | null
           shipping_address_id?: string | null
