@@ -31,14 +31,14 @@ const handler = async (req: Request): Promise<Response> => {
     // Get all users from profiles table
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, email, full_name, role, created_at')
+      .select('user_id, email, full_name, role, created_at')
       .order('created_at', { ascending: false });
 
     if (profilesError) throw profilesError;
 
     // Combine auth users with profile data
-    const usersWithAuthStatus = (authUsers.users || []).map((authUser) => {
-      const profile = profiles?.find(p => p.id === authUser.id);
+    const usersWithAuthStatus = (authUsers.users || []).map((authUser:any) => {
+      const profile = profiles?.find(p => p.user_id === authUser.id);
       
       return {
         id: authUser.id,
