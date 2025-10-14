@@ -136,12 +136,12 @@ const AdminDashboard = () => {
 
       // Check if user is admin
       const { data: profile } = await supabase
-        .from('profiles')
+        .from('profiles' as any)
         .select('role')
-        .eq('id', session.user.id)
+        .eq('user_id', session.user.id)
         .single();
 
-      if (profile?.role !== 'admin') {
+      if ((profile as any)?.role !== 'admin') {
         toast({
           variant: "destructive",
           title: "Access Denied",

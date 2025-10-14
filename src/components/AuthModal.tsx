@@ -36,6 +36,11 @@ interface AuthModalProps {
   onOpenFarmerModal?: () => void;
 }
 
+type Profile = {
+  role: string;
+};
+
+
 export const AuthModal = ({ open, onOpenChange, onOpenFarmerModal }: AuthModalProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -95,10 +100,10 @@ export const AuthModal = ({ open, onOpenChange, onOpenFarmerModal }: AuthModalPr
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const { data: profile } = await supabase
-          .from('profiles')
+          .from('profiles' as any)
           .select('role')
-          .eq('id', session.user.id)
-          .single();
+          .eq('user_id', session.user.id)
+          .single<Profile>();
         
         if (profile?.role === 'admin') {
           onOpenChange(false);
