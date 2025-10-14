@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Wheat, User, Building, Leaf, X } from "lucide-react";
+import { Wheat, User, Building, Leaf, X, Plus, Twitter, Facebook, Instagram } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,19 +18,37 @@ import { supabase } from "@/integrations/supabase/client";
 const farmerApplicationSchema = z.object({
   contactPerson: z.string().min(2, "Contact person name must be at least 2 characters"),
   email: z.string().min(1, "Email is required"),
-  phone: z.string().min(10, "Please enter a valid phone number"),
+  phone: z.string()
+    .min(10, "Phone number must be at least 10 characters")
+    .max(15, "Phone number cannot be longer than 15 characters")
+    .refine(
+      (value) => /^\+?1?\s*\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}$/.test(value),
+      "Please enter a valid US phone number (e.g. +1 (555) 123-4567)"
+    ),
   farmName: z.string().min(2, "Farm name must be at least 2 characters"),
   farmAddress: z.string().min(10, "Please provide a detailed address"),
+  farmType: z.string(),
+  farmImage: z.string().optional(),
   farmCoordinates: z.array(z.number()).optional(),
   farmBio: z.string().min(50, "Please provide at least 50 characters describing your farm"),
+  socialLinks: z.array(z.object({
+    platform: z.enum(["facebook", "twitter", "instagram"]),
+    url: z.string().url("Please enter a valid URL")
+  })).optional(),
   products: z.array(z.string()).min(1, "Please select at least one product type"),
   termsAccepted: z.boolean().refine(val => val === true, "You must accept the terms and conditions"),
 });
 
 type FarmerApplicationForm = z.infer<typeof farmerApplicationSchema>;
 
+const socialPlatforms = [
+  { value: "facebook", label: "Facebook", icon: Facebook },
+  { value: "twitter", label: "Twitter", icon: Twitter },
+  { value: "instagram", label: "Instagram", icon: Instagram }
+];
+
 const productOptions = [
-  "Fruits", "Vegetables", "Herbs", "Dairy Products", "Eggs", 
+  "Fruits", "Vegetables", "Herbs", "Dairy Products", "Eggs",
   "Meat & Poultry", "Grains & Cereals", "Honey & Bee Products",
   "Flowers & Plants", "Preserved Foods", "Organic Products", "Firewood", "Not Listed"
 ];
@@ -43,6 +61,18 @@ interface JoinAsFarmerModalProps {
 export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [farmCoordinates, setFarmCoordinates] = useState<[number, number] | null>(null);
+  const [farmImageFile, setFarmImageFile] = useState<File | null>(null);
+  const [farmImagePreview, setFarmImagePreview] = useState<string | null>(null);
+  const [socialLinksCount, setSocialLinksCount] = useState(1);
+
+  // Reset image state when modal closes
+  const handleModalChange = (open: boolean) => {
+    if (!open) {
+      setFarmImageFile(null);
+      setFarmImagePreview(null);
+    }
+    onOpenChange(open);
+  };
   const { toast } = useToast();
 
   // Generate a random password
@@ -64,8 +94,10 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
       phone: "",
       farmName: "",
       farmAddress: "",
+      farmType: "",
       farmCoordinates: undefined,
       farmBio: "",
+      socialLinks: [{ platform: "facebook", url: "" }],
       products: [],
       termsAccepted: false,
     },
@@ -73,7 +105,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
 
   const onSubmit = async (data: FarmerApplicationForm) => {
     setIsSubmitting(true);
-    
+
     try {
       // Generate temporary password
       const tempPassword = generatePassword();
@@ -98,6 +130,21 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
         throw new Error("User creation failed");
       }
 
+      let imageUrl = '';
+      if (farmImageFile) {
+        const fileExt = farmImageFile.name.split('.').pop();
+        const fileName = `${authData.user.id}-${Date.now()}.${fileExt}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('farmers_bucket')
+          .upload(fileName, farmImageFile, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: farmImageFile.type,
+          });
+        if (uploadError) throw uploadError;
+        imageUrl = supabase.storage.from('farmers_bucket').getPublicUrl(fileName).data.publicUrl;
+      }
+
       // Submit farmer application with the new user's ID
       const { error: applicationError } = await supabase
         .from('farmer_applications')
@@ -107,15 +154,18 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
           phone: data.phone,
           farm_name: data.farmName,
           farm_address: data.farmAddress,
+          farm_type: data.farmType,
           farm_coordinates: farmCoordinates,
           farm_bio: data.farmBio,
           products: data.products,
           approval_status: 'pending',
-          user_id: authData.user.id
+          user_id: authData.user.id,
+          social_links: data.socialLinks,
+          farm_image_url: imageUrl
         });
 
       if (applicationError) throw applicationError;
-
+      console.log("Temp password", tempPassword)
       toast({
         title: "Application submitted successfully!",
         description: `Your farmer application has been submitted with email: ${data.email}. Your temporary password is: ${tempPassword}. Please save this and check your email for confirmation.`,
@@ -123,12 +173,14 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
       });
 
       form.reset();
-      onOpenChange(false);
+      setFarmImageFile(null);
+      setFarmImagePreview(null);
+      handleModalChange(false);
     } catch (error: any) {
       console.error('Error submitting application:', error);
-      
+
       let errorMessage = "There was an issue submitting your application. Please try again.";
-      
+
       // Handle specific email validation errors
       if (error.message?.includes("email_address_invalid") || (error.message?.includes("Email address") && error.message?.includes("invalid"))) {
         errorMessage = "The email address you entered appears to be invalid or blocked by our system. Please try using a different email address (Gmail, Yahoo, Outlook, etc.) or contact support if you believe this is an error.";
@@ -139,7 +191,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       toast({
         title: "Submission Error",
         description: errorMessage,
@@ -160,7 +212,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleModalChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0">
         <ScrollArea className="max-h-[90vh]">
           <div className="p-6">
@@ -171,7 +223,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                 Join Our Farming Community
               </DialogTitle>
               <DialogDescription className="text-lg max-w-2xl mx-auto">
-                Join our platform to connect directly with local customers, showcase your fresh produce, 
+                Join our platform to connect directly with local customers, showcase your fresh produce,
                 and grow your farming business. We support sustainable agriculture and fair trade practices.
               </DialogDescription>
             </DialogHeader>
@@ -179,14 +231,14 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
             {/* Application Form */}
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                {/* Contact Information */}
+
                 <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
+                  <div className="flex-1 space-y-4">
                     <h3 className="text-lg font-semibold text-farm-green flex items-center gap-2">
                       <User className="h-5 w-5" />
                       Contact Information
                     </h3>
-                    
+
                     <FormField
                       control={form.control}
                       name="contactPerson"
@@ -208,10 +260,10 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                         <FormItem>
                           <FormLabel>Email Address <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
-                            <Input 
-                              type="email" 
+                            <Input
+                              type="email"
                               placeholder="your.email@example.com"
-                              {...field} 
+                              {...field}
                             />
                           </FormControl>
                           <FormMessage />
@@ -226,16 +278,129 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                         <FormItem>
                           <FormLabel>Phone Number <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
-                            <Input 
-                              type="tel" 
+                            <Input
+                              type="tel"
                               placeholder="+1 (555) 123-4567"
-                              {...field} 
+                              {...field}
+                              onChange={(e) => {
+                                let value = e.target.value.replace(/\D/g, "");
+                                 value = value.slice(0, 11);
+                                if (value.length > 0) {
+                                  if (value.startsWith("1")) {
+                                    value = value.slice(1);
+                                  }
+                                  // Format the remaining digits
+                                  if (value.length > 0) {
+                                    if (value.length <= 10) {
+                                      value = value.replace(/(\d{0,3})(\d{0,3})(\d{0,4})/, (_, p1, p2, p3) => {
+                                        let parts = [];
+                                        if (p1) parts.push(`(${p1}`);
+                                        if (p2) parts.push(`${p1 ? ") " : "("}${p2}`);
+                                        if (p3) parts.push(`${p2 ? "-" : ") "}${p3}`);
+                                        return parts.join("");
+                                      });
+                                    }
+                                    // Always prepend +1
+                                    value = "+1 " + value;
+                                  }
+                                }
+                                field.onChange(value);
+                              }}
                             />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+
+                    <FormField
+                      control={form.control}
+                      name="farmType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Farm Type <span className="text-destructive">*</span></FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g. Dairy"
+                              {...field}
+                              value={typeof field.value === 'string' ? field.value : ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="space-y-4">
+                      {/* Social Links */}
+                      <h3 className="text-lg font-semibold text-farm-green flex items-center gap-2">
+                        <Building className="h-5 w-5" />
+                        Social Media Links
+                      </h3>
+                      <div className="space-y-4">
+                        {[...Array(socialLinksCount)].map((_, index) => (
+                          <div key={index} className="flex items-center gap-4">
+                            <div className="flex-1 space-y-2">
+                              <select
+                                className="w-full rounded-md border border-input bg-background px-3 h-10 text-sm"
+                                value={form.watch(`socialLinks.${index}.platform`)}
+                                onChange={(e) => {
+                                  form.setValue(`socialLinks.${index}.platform`, e.target.value as "facebook" | "twitter" | "instagram");
+                                }}
+                              >
+                                {socialPlatforms.map((platform) => (
+                                  <option key={platform.value} value={platform.value}>
+                                    {platform.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                type="url"
+                                placeholder="Enter social media profile URL"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                {...form.register(`socialLinks.${index}.url`)}
+                              />
+                              {form.formState.errors.socialLinks?.[index]?.url && (
+                                <p className="text-sm text-destructive">{form.formState.errors.socialLinks[index]?.url?.message}</p>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              {index > 0 && (
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  className="h-10 w-10"
+                                  onClick={() => {
+                                    setSocialLinksCount(prev => prev - 1);
+                                    const currentLinks = form.getValues("socialLinks") || [];
+                                    currentLinks.splice(index, 1);
+                                    form.setValue("socialLinks", currentLinks);
+                                  }}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {index === socialLinksCount - 1 && index < 2 && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-10 w-10"
+                                  onClick={() => {
+                                    setSocialLinksCount(prev => prev + 1);
+                                    const currentLinks = form.getValues("socialLinks") || [];
+                                    form.setValue("socialLinks", [...currentLinks, { platform: "facebook", url: "" }]);
+                                  }}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Farm Information */}
@@ -285,6 +450,57 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                         </FormItem>
                       )}
                     />
+                    <div className="flex justify-center">
+                      <div className="flex-1 flex flex-col items-center justify-center bg-farm-cream/60 rounded-lg p-4 border border-farm-green-light max-w-[300px]">
+                        <FormLabel className="font-semibold text-farm-green flex items-center gap-2 mb-2 justify-center">
+                          <Wheat className="h-5 w-5" /> Farm Logo
+                        </FormLabel>
+                        <div className="flex flex-col items-center gap-2 justify-center">
+                          <div className="w-24 h-24 rounded-full bg-farm-green/10 flex items-center justify-center mb-2 border border-farm-green-light overflow-hidden">
+                            {farmImagePreview ? (
+                              <img src={farmImagePreview} alt="Farm Preview" className="w-full h-full object-cover rounded-full" />
+                            ) : (
+                              <Wheat className="h-10 w-10 text-farm-green/40" />
+                            )}
+                          </div>
+                          <div className="flex flex-col items-center w-full">
+                            <label htmlFor="farm-image-upload" className="cursor-pointer inline-block px-4 py-2 bg-farm-green text-white rounded-full font-semibold text-sm mb-1 hover:bg-farm-green-light transition">
+                              Choose File
+                            </label>
+                            <input
+                              id="farm-image-upload"
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={e => {
+                                const file = e.target.files?.[0] || null;
+                                setFarmImageFile(file);
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => setFarmImagePreview(reader.result as string);
+                                  reader.readAsDataURL(file);
+                                } else {
+                                  setFarmImagePreview(null);
+                                }
+                              }}
+                            />
+                            <span className="text-xs text-muted-foreground mt-1">
+                              {farmImageFile ? farmImageFile.name : 'No file chosen'}
+                            </span>
+                          </div>
+                          {farmImagePreview && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              className="mt-1"
+                              onClick={() => { setFarmImageFile(null); setFarmImagePreview(null); }}
+                            >Remove</Button>
+                          )}
+                          <span className="text-xs text-muted-foreground text-center mt-2">Upload a clear image of your farm.<br />Supported formats: JPG, PNG, GIF.</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -294,7 +510,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                     <Leaf className="h-5 w-5" />
                     About Your Farm
                   </h3>
-                  
+
                   <FormField
                     control={form.control}
                     name="farmBio"
@@ -302,10 +518,10 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                       <FormItem>
                         <FormLabel>Farm Description <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
-                          <Textarea 
+                          <Textarea
                             placeholder="Tell us about your farm, farming practices, history, sustainability efforts, and what makes your products special..."
                             className="min-h-[100px]"
-                            {...field} 
+                            {...field}
                           />
                         </FormControl>
                         <FormMessage />
@@ -318,14 +534,14 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-farm-green">Products You Offer <span className="text-destructive">*</span></h3>
                   <p className="text-sm text-muted-foreground">Select all product types that apply to your farm:</p>
-                  
+
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {productOptions.map((product) => (
                       <div key={product} className="flex items-center space-x-2">
                         <Checkbox
                           id={product}
                           checked={form.watch("products").includes(product)}
-                          onCheckedChange={(checked) => 
+                          onCheckedChange={(checked) =>
                             handleProductChange(product, checked as boolean)
                           }
                         />
@@ -338,7 +554,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                       </div>
                     ))}
                   </div>
-                  
+
                   {form.formState.errors.products && (
                     <p className="text-sm font-medium text-destructive">
                       {form.formState.errors.products.message}
@@ -364,7 +580,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                             I agree to the terms and conditions <span className="text-destructive">*</span>
                           </FormLabel>
                           <p className="text-sm text-muted-foreground">
-                            By checking this box, you agree to our platform guidelines, 
+                            By checking this box, you agree to our platform guidelines,
                             quality standards, and partnership agreement.
                           </p>
                           <FormMessage />
@@ -376,15 +592,15 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
 
                 {/* Submit Button */}
                 <div className="flex justify-center gap-3 pt-4 border-t">
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={isSubmitting || !form.watch("termsAccepted")}
                     className="min-w-[150px] bg-gradient-to-r from-farm-green to-farm-green-light hover:from-farm-green-light hover:to-farm-green transition-smooth disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSubmitting ? "Submitting..." : "Submit Application"}
                   </Button>
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     variant="outline"
                     onClick={() => onOpenChange(false)}
                     disabled={isSubmitting}

@@ -23,6 +23,7 @@ interface InventoryItem {
   low_stock_threshold: number;
   location: string;
   notes: string;
+  product: {title: string}
   last_updated_by: string;
   created_at: string;
   updated_at: string;
@@ -145,7 +146,8 @@ const InventoryManagement = () => {
         .from('inventory_tracking')
         .select(`
           *,
-          farms!inventory_tracking_farm_id_fkey(name)
+          farms!inventory_tracking_farm_id_fkey(name),
+          product!inventory_tracking_variant_id_fkey(title)
         `)
         .eq('farm_id', farmId)
         .order('created_at', { ascending: false });

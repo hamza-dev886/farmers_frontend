@@ -18,6 +18,7 @@ interface InventoryItem {
   last_updated_by: string;
   created_at: string;
   updated_at: string;
+  product: {title: string}
   // Join fields from product if needed
   product_name?: string;
   sku?: string;
@@ -132,7 +133,7 @@ export function InventoryTable({ items, onEdit, onDelete, onAdjustStock, loading
                     <div className="space-y-1">
                       <div className="font-medium flex items-center gap-2">
                         <Package className="h-4 w-4 text-muted-foreground" />
-                        {item.product_name || `Variant ${item.variant_id.slice(0, 8)}`}
+                        {item.product.title || `Variant ${item.variant_id.slice(0, 8)}`}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         📍 {item.location || 'Main Storage'}
@@ -164,7 +165,7 @@ export function InventoryTable({ items, onEdit, onDelete, onAdjustStock, loading
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => onAdjustStock(item.id, -1, 'remove')}
+                        onClick={() => onAdjustStock(item.id, 1, 'remove')}
                         disabled={item.quantity_available <= 0}
                       >
                         <Minus className="h-3 w-3" />
