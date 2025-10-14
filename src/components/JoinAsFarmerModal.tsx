@@ -20,7 +20,7 @@ const farmerApplicationSchema = z.object({
   email: z.string().min(1, "Email is required"),
   phone: z.string()
     .min(10, "Phone number must be at least 10 characters")
-    .max(15, "Phone number cannot be longer than 15 characters")
+    .max(20, "Phone number cannot be longer than 15 characters")
     .refine(
       (value) => /^\+?1?\s*\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}$/.test(value),
       "Please enter a valid US phone number (e.g. +1 (555) 123-4567)"
@@ -32,9 +32,9 @@ const farmerApplicationSchema = z.object({
   farmCoordinates: z.array(z.number()).optional(),
   farmBio: z.string().min(50, "Please provide at least 50 characters describing your farm"),
   socialLinks: z.array(z.object({
-    platform: z.enum(["facebook", "twitter", "instagram"]),
-    url: z.string().url("Please enter a valid URL")
-  })).optional(),
+    platform: z.enum(["facebook", "twitter", "instagram"]).nullable(),
+    url: z.string().url("Please enter a valid URL").or(z.literal("")).nullable(),
+  }).optional()).nullable(),
   products: z.array(z.string()).min(1, "Please select at least one product type"),
   termsAccepted: z.boolean().refine(val => val === true, "You must accept the terms and conditions"),
 });
@@ -339,64 +339,59 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                       </h3>
                       <div className="space-y-4">
                         {[...Array(socialLinksCount)].map((_, index) => (
-                          <div key={index} className="flex items-center gap-4">
-                            <div className="flex-1 space-y-2">
-                              <select
-                                className="w-full rounded-md border border-input bg-background px-3 h-10 text-sm"
-                                value={form.watch(`socialLinks.${index}.platform`)}
-                                onChange={(e) => {
-                                  form.setValue(`socialLinks.${index}.platform`, e.target.value as "facebook" | "twitter" | "instagram");
+                          <div key={index} className="flex flex-col">
+                            <div className="flex flex-row gap-3">
+                              <div className="flex-1 space-y-2">
+                                <select
+                                  className="w-full rounded-md border border-input bg-background px-3 h-10 text-sm"
+                                  value={form.watch(`socialLinks.${index}.platform`)}
+                                  onChange={(e) => {
+                                    form.setValue(`socialLinks.${index}.platform`, e.target.value as "facebook" | "twitter" | "instagram");
+                                  }}
+                                >
+                                  {socialPlatforms.map((platform) => (
+                                    <option key={platform.value} value={platform.value}>
+                                      {platform.label}
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="url"
+                                  placeholder="Enter social media profile URL"
+                                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                  {...form.register(`socialLinks.${index}.url`)}
+                                />
+                                {form.formState.errors.socialLinks?.[index]?.url && (
+                                  <p className="text-sm text-destructive">{form.formState.errors.socialLinks[index]?.url?.message}</p>
+                                )}
+                              </div>
+                              <div className="flex gap-2 mt-2">
+                                {index > 0 && (
+                                  <X className="h-4 w-4 text-black"
+                                    onClick={() => {
+                                      setSocialLinksCount(prev => prev - 1);
+                                      const currentLinks = form.getValues("socialLinks") || [];
+                                      currentLinks.splice(index, 1);
+                                      form.setValue("socialLinks", currentLinks);
+                                    }} />
+                                )}
+                              </div>
+                            </div>
+                            {index === socialLinksCount && index < 2 && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-10 w-36 mt-3 bg-farm-green text-white"
+                                onClick={() => {
+                                  setSocialLinksCount(prev => prev + 1);
+                                  const currentLinks = form.getValues("socialLinks") || [];
+                                  form.setValue("socialLinks", [...currentLinks, { platform: "facebook", url: "" }]);
                                 }}
                               >
-                                {socialPlatforms.map((platform) => (
-                                  <option key={platform.value} value={platform.value}>
-                                    {platform.label}
-                                  </option>
-                                ))}
-                              </select>
-                              <input
-                                type="url"
-                                placeholder="Enter social media profile URL"
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                {...form.register(`socialLinks.${index}.url`)}
-                              />
-                              {form.formState.errors.socialLinks?.[index]?.url && (
-                                <p className="text-sm text-destructive">{form.formState.errors.socialLinks[index]?.url?.message}</p>
-                              )}
-                            </div>
-                            <div className="flex gap-2">
-                              {index > 0 && (
-                                <Button
-                                  type="button"
-                                  variant="destructive"
-                                  size="icon"
-                                  className="h-10 w-10"
-                                  onClick={() => {
-                                    setSocialLinksCount(prev => prev - 1);
-                                    const currentLinks = form.getValues("socialLinks") || [];
-                                    currentLinks.splice(index, 1);
-                                    form.setValue("socialLinks", currentLinks);
-                                  }}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {index === socialLinksCount - 1 && index < 2 && (
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="icon"
-                                  className="h-10 w-10"
-                                  onClick={() => {
-                                    setSocialLinksCount(prev => prev + 1);
-                                    const currentLinks = form.getValues("socialLinks") || [];
-                                    form.setValue("socialLinks", [...currentLinks, { platform: "facebook", url: "" }]);
-                                  }}
-                                >
-                                  <Plus className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
+                                <Plus className="h-4 w-4" />    Add Social link
+                              </Button>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -451,7 +446,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                       )}
                     />
                     <div className="flex justify-center">
-                      <div className="flex-1 flex flex-col items-center justify-center bg-farm-cream/60 rounded-lg p-4 border border-farm-green-light max-w-[300px]">
+                      <div className="flex-1 flex flex-col items-center justify-center bg-farm-cream/60 rounded-lg p-4 border border-farm-green-light">
                         <FormLabel className="font-semibold text-farm-green flex items-center gap-2 mb-2 justify-center">
                           <Wheat className="h-5 w-5" /> Farm Logo
                         </FormLabel>
