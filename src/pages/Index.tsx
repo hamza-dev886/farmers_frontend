@@ -41,14 +41,14 @@ const Index = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const { data: profile } = await supabase
-          .from('profiles')
+          .from('profiles' as any)
           .select('role')
-          .eq('id', session.user.id)
+          .eq('user_id', session.user.id)
           .single();
         
-        if (profile?.role === 'admin') {
+        if ((profile as any)?.role === 'admin') {
           navigate('/admin');
-        } else if (profile?.role === 'farmer') {
+        } else if ((profile as any)?.role === 'farmer') {
           navigate('/farmer-dashboard');
         }
       }
