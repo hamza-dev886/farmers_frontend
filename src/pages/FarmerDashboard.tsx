@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { z } from 'zod';
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,14 +13,16 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { MapboxAutocomplete } from "@/components/ui/mapbox-autocomplete";
+import { MapboxMapPreview } from "@/components/ui/mapbox-map-preview";
+import { Slider } from "@/components/ui/slider";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Package, 
-  BarChart3, 
-  Settings, 
-  Plus, 
-  Edit, 
-  Trash, 
+import { Switch } from "@/components/ui/switch";
+import {
+  Package,
+  Plus,
+  Edit,
   Eye,
   TrendingUp,
   ShoppingCart,
@@ -27,7 +30,6 @@ import {
   DollarSign
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import type { User } from "@supabase/supabase-js";
 
 interface FarmData {
   id: string;
@@ -64,6 +66,8 @@ interface Inventory {
   last_updated_by: string;
   created_at: string;
   updated_at: string;
+  // Supabase query aliases variant details into `product` (see fetchInventory select)
+  product?: any;
 }
 
 interface CurrentPlan {
@@ -85,7 +89,7 @@ interface DashboardStats {
 }
 
 const FarmerDashboard = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [isFarmer, setIsFarmer] = useState(false);
   const [farmData, setFarmData] = useState<FarmData[]>([]);
   const [selectedFarm, setSelectedFarm] = useState<FarmData | null>(null);
@@ -102,14 +106,221 @@ const FarmerDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [farmModalOpen, setFarmModalOpen] = useState(false);
   const [addFarmModalOpen, setAddFarmModalOpen] = useState(false);
-  const [productModalOpen, setProductModalOpen] = useState(false);
-  const [inventoryModalOpen, setInventoryModalOpen] = useState(false);
+  const [addStallModalOpen, setAddStallModalOpen] = useState(false);
+  const [isStallLoading, setIsStallLoading] = useState(false);
+
+  // Stall validation schema
+  const stallSchema = z.object({
+    name: z.string().min(1, "Stall name is required"),
+    location: z.string().min(1, "Location is required"),
+    photos: z.array(z.instanceof(File)).optional(),
+    isAttended: z.boolean(),
+    operatingHours: z.record(
+      z.object({
+        isOpen: z.boolean(),
+        intervals: z.array(z.object({
+          start: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format"),
+          end: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format")
+        }))
+      })
+    )
+    ,
+    fenceRadius: z.number().min(50, "Fence radius must be at least 50m").max(150, "Fence radius must be at most 150m").optional()
+  });
+
+  type DayOperatingHours = {
+    isOpen: boolean;
+    intervals: Array<{ start: string; end: string }>;
+  };
+
+  type StallForm = {
+    name: string;
+    location: string;
+    photos: File[];
+    isAttended: boolean;
+    selectedDay: string;
+    fenceRadius?: number;
+    operatingHours: {
+      [key: string]: DayOperatingHours;
+    };
+  };
+
+  const [stallFormData, setStallFormData] = useState<StallForm>({
+    name: '',
+    location: '',
+    photos: [],
+    isAttended: true,
+    fenceRadius: 75,
+    selectedDay: 'monday',
+    operatingHours: {
+      monday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+      tuesday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+      wednesday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+      thursday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+      friday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+      saturday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+      sunday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+    }
+  });
+  const [stallErrors, setStallErrors] = useState<Record<string, string>>({});
+  const [stallCoordinates, setStallCoordinates] = useState<[number, number] | null>(null); // [lng, lat]
+  const [selectedInventoryIds, setSelectedInventoryIds] = useState<string[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<Array<{ file: File; url: string }>>([]);
+  // Cleanup object URLs when previews change or component unmounts
+  useEffect(() => {
+    return () => {
+      photoPreviews.forEach((p) => URL.revokeObjectURL(p.url));
+    };
+  }, [photoPreviews]);
+
+  const [stallStep, setStallStep] = useState<number>(1); // 1 = basic info, 2 = images & hours
+
+  // Zod schema for step1 (basic info only)
+  const stallStep1Schema = z.object({
+    name: z.string().min(1, "Stall name is required"),
+    location: z.string().min(1, "Location is required"),
+    isAttended: z.boolean()
+  });
+
+  const handleStallSubmission = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (stallStep === 1) {
+      // validate locally and proceed to step 2
+      try {
+        const validated = stallStep1Schema.parse({
+          name: stallFormData.name,
+          location: stallFormData.location,
+          isAttended: stallFormData.isAttended
+        });
+        setStallErrors({});
+        setStallStep(2);
+      } catch (err) {
+        if (err instanceof z.ZodError) {
+          const fieldErrors: Record<string, string> = {};
+          err.errors.forEach((e) => {
+            if (e.path[0]) fieldErrors[e.path[0].toString()] = e.message;
+          });
+          setStallErrors(fieldErrors);
+        }
+      }
+    } else {
+      await handleStallFinalSubmit();
+    }
+  };
+
+  // Step 2: upload images and update operating hours for the created stall
+  const handleStallFinalSubmit = async () => {
+    setIsStallLoading(true);
+    try {
+      if (!selectedFarm?.id) throw new Error('No farm selected');
+
+  // Upload photos to storage and collect filenames to store in DB
+  const photoNames: string[] = [];
+  for (const photo of stallFormData.photos || []) {
+        // derive a safe extension, fallback to png
+        let fileExt = (photo.name || '').split('.').pop() || '';
+        fileExt = fileExt.match(/^[a-zA-Z0-9]+$/) ? fileExt : 'png';
+
+        // use crypto.randomUUID when available for uniqueness, else fallback to timestamp+random
+        let uniqueId: string;
+        try {
+          // @ts-ignore - some environments provide crypto
+          uniqueId = (globalThis.crypto && (globalThis.crypto as any).randomUUID) ? (globalThis.crypto as any).randomUUID() : '';
+        } catch (e) {
+          uniqueId = '';
+        }
+
+        if (!uniqueId) {
+          uniqueId = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 10)}`;
+        }
+
+        // include farm id, timestamp and unique id in filename
+        const fileName = `${selectedFarm.id}-${Date.now()}-${uniqueId}.${fileExt}`;
+        const filePath = `${selectedFarm.id}/stalls/${fileName}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('farmers_bucket')
+          .upload(filePath, photo, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: photo.type || 'image/png'
+          });
+
+        if (uploadError) {
+          console.error('Error uploading photo:', uploadError);
+          continue;
+        }
+
+        // store only the filename in DB column `stall_images`
+        photoNames.push(fileName);
+      }
+
+      // Insert the stall row with operating hours and photo paths
+      const payload: any = {
+        name: stallFormData.name,
+        location: stallFormData.location,
+        // is_attended: stallFormData.isAttended,
+        operating_hours: stallFormData.operatingHours,
+        farm_id: selectedFarm.id
+      };
+      // include geo-fence radius in meters
+      if (stallFormData.fenceRadius !== undefined) {
+        payload.fence_radius_m = stallFormData.fenceRadius;
+      }
+      // include selected inventory item ids
+      if (selectedInventoryIds && selectedInventoryIds.length > 0) {
+        payload.inventory_item_ids = selectedInventoryIds;
+      }
+      // Include coordinates if selected (lng, lat)
+      if (stallCoordinates) {
+        payload.longitude = stallCoordinates[0];
+        payload.latitude = stallCoordinates[1];
+      }
+  if (photoNames.length > 0) payload.stall_images = photoNames;
+
+      console.log('Stall payload:', payload);
+
+      const { error } = await (supabase as any)
+        .from('farm_stalls')
+        .insert(payload);
+
+        console.log('Stall insert response error:', error );
+
+      if (error) throw error;
+
+      toast({ title: 'Success', description: 'Stall created successfully!' });
+      setAddStallModalOpen(false);
+      // reset
+      setStallFormData({
+        name: '',
+        location: '',
+        photos: [],
+        isAttended: true,
+        selectedDay: 'monday',
+        operatingHours: {
+          monday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+          tuesday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+          wednesday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+          thursday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+          friday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+          saturday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+          sunday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] }
+        }
+      });
+      setPhotoPreviews([]);
+      setStallStep(1);
+    } catch (err) {
+      if (err instanceof Error) {
+        toast({ variant: 'destructive', title: 'Error', description: err.message });
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to finalize stall.' });
+      }
+    } finally {
+      setIsStallLoading(false);
+    }
+  };
   const [farmFormData, setFarmFormData] = useState<Partial<FarmData>>({});
   const [newFarmFormData, setNewFarmFormData] = useState<Partial<FarmData>>({});
-  const [productFormData, setProductFormData] = useState<Partial<Product>>({});
-  const [inventoryFormData, setInventoryFormData] = useState<Partial<Inventory>>({});
-  const [editingItem, setEditingItem] = useState<string | null>(null);
-  const [selectedItem, setSelectedItem] = useState<any>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -120,7 +331,7 @@ const FarmerDashboard = () => {
   const checkUserAuth = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session?.user) {
         navigate('/');
         return;
@@ -148,8 +359,6 @@ const FarmerDashboard = () => {
       setIsFarmer(true);
       await fetchCurrentPlan(session.user);
       await fetchFarmData(session.user);
-      await fetchProducts();
-      await fetchInventory();
     } catch (error) {
       console.error('Error checking auth:', error);
       navigate('/');
@@ -158,10 +367,26 @@ const FarmerDashboard = () => {
     }
   };
 
+  // Ensure products and inventory are fetched whenever a farm is selected (or user becomes available)
+  useEffect(() => {
+    if (!user || !selectedFarm) return;
+
+    // fetch both lists in parallel
+    const load = async () => {
+      try {
+        await Promise.all([fetchProducts(), fetchInventory()]);
+      } catch (err) {
+        console.error('Error loading products/inventory after selecting farm:', err);
+      }
+    };
+
+    load();
+  }, [user, selectedFarm]);
+
   const fetchFarmData = async (currentUser?: any) => {
     const userId = currentUser?.id || user?.id;
     if (!userId) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('farms')
@@ -212,11 +437,11 @@ const FarmerDashboard = () => {
       }));
 
       setProducts(formattedProducts);
-      
+
       // Update stats
       const total = formattedProducts.length;
       const active = formattedProducts.filter(p => p.status === 'published').length;
-      
+
       setStats(prev => ({
         ...prev,
         totalProducts: total,
@@ -233,18 +458,24 @@ const FarmerDashboard = () => {
     try {
       const { data, error } = await supabase
         .from('inventory_tracking')
-        .select('*')
+        .select(`
+          *,
+          product:variant_id (
+          *
+          )`)
         .eq('farm_id', selectedFarm.id);
+
+        console.log('Inventory fetch response:', data );
 
       if (error) throw error;
 
       setInventory(data || []);
-      
+
       // Update stats for low stock items
-      const lowStock = (data || []).filter(item => 
+      const lowStock = (data || []).filter(item =>
         item.quantity_available <= item.low_stock_threshold
       ).length;
-      
+
       setStats(prev => ({
         ...prev,
         lowStockItems: lowStock
@@ -420,7 +651,7 @@ const FarmerDashboard = () => {
               <div className="text-2xl font-bold">{stats.totalProducts}</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Active Products</CardTitle>
@@ -430,7 +661,7 @@ const FarmerDashboard = () => {
               <div className="text-2xl font-bold text-green-600">{stats.activeProducts}</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
@@ -440,7 +671,7 @@ const FarmerDashboard = () => {
               <div className="text-2xl font-bold text-yellow-600">{stats.lowStockItems}</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Current Plan</CardTitle>
@@ -456,13 +687,42 @@ const FarmerDashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="farm">My Farm</TabsTrigger>
+            <TabsTrigger value="stalls">My Stalls</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
-          
-          {/* Overview Tab */}
+
+          <TabsContent value="stalls">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Stalls</CardTitle>
+                  <CardDescription>
+                    Review and manage your stalls
+                  </CardDescription>
+                </div>
+                <Button onClick={() => setAddStallModalOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Stall
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Attended Status</TableHead>
+                      <TableHead>Operating Hours</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="overview">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Farm Information */}
@@ -514,36 +774,36 @@ const FarmerDashboard = () => {
                   <CardDescription>Your active pricing plan and features</CardDescription>
                 </CardHeader>
                 <CardContent>
-                      {selectedFarm ? (
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Plan Name</p>
-                            <p className="text-lg font-semibold">{currentPlan.plan_name}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Price</p>
-                            <p>{currentPlan.price} / {currentPlan.billing_cycle}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Max Products</p>
-                            <p>{currentPlan.max_products} products</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Transaction Fee</p>
-                            <p>{currentPlan.transaction_fee}%</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Assigned On</p>
-                            <p>{new Date(currentPlan.assigned_at).toLocaleDateString()}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Multiple Farms</p>
-                            <p>{canAddMultipleFarms() ? 'Allowed' : 'Not Available'}</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-muted-foreground">No active subscription plan.</p>
-                      )}
+                  {selectedFarm ? (
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Plan Name</p>
+                        <p className="text-lg font-semibold">{currentPlan.plan_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Price</p>
+                        <p>{currentPlan.price} / {currentPlan.billing_cycle}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Max Products</p>
+                        <p>{currentPlan.max_products} products</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Transaction Fee</p>
+                        <p>{currentPlan.transaction_fee}%</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Assigned On</p>
+                        <p>{new Date(currentPlan.assigned_at).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Multiple Farms</p>
+                        <p>{canAddMultipleFarms() ? 'Allowed' : 'Not Available'}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">No active subscription plan.</p>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -580,8 +840,8 @@ const FarmerDashboard = () => {
                   {farmData.length > 1 && (
                     <div className="mb-6">
                       <Label htmlFor="farm-selector">Select Farm</Label>
-                      <Select 
-                        value={selectedFarm?.id || ''} 
+                      <Select
+                        value={selectedFarm?.id || ''}
                         onValueChange={(value) => {
                           const farm = farmData.find(f => f.id === value);
                           setSelectedFarm(farm || null);
@@ -625,7 +885,7 @@ const FarmerDashboard = () => {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="space-y-4">
                         <div>
                           <h3 className="text-lg font-semibold mb-2">Location & Description</h3>
@@ -644,7 +904,7 @@ const FarmerDashboard = () => {
                             </div>
                           </div>
                         </div>
-                        
+
                         <div>
                           <h3 className="text-lg font-semibold mb-2">Plan Limits</h3>
                           <div className="space-y-2">
@@ -687,7 +947,7 @@ const FarmerDashboard = () => {
                   {!canAddMultipleFarms() && farmData.length === 0 && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
                       <p className="text-sm text-blue-800">
-                        Your current plan allows only one farm location. 
+                        Your current plan allows only one farm location.
                         Upgrade to a Business or higher plan to manage multiple farms.
                       </p>
                     </div>
@@ -710,7 +970,7 @@ const FarmerDashboard = () => {
                     <h3 className="text-lg font-medium mb-4">Profile Information</h3>
                     <p className="text-muted-foreground">Update your personal and farm information in the Overview tab.</p>
                   </div>
-                  
+
                   <div>
                     <h3 className="text-lg font-medium mb-4">Subscription Plan</h3>
                     <p className="text-muted-foreground">
@@ -733,65 +993,65 @@ const FarmerDashboard = () => {
                 Update your farm details and contact information.
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="farm-name">Farm Name</Label>
                 <Input
                   id="farm-name"
                   value={farmFormData.name || ''}
-                  onChange={(e) => setFarmFormData({...farmFormData, name: e.target.value})}
+                  onChange={(e) => setFarmFormData({ ...farmFormData, name: e.target.value })}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="contact-person">Contact Person</Label>
                 <Input
                   id="contact-person"
                   value={farmFormData.contact_person || ''}
-                  onChange={(e) => setFarmFormData({...farmFormData, contact_person: e.target.value})}
+                  onChange={(e) => setFarmFormData({ ...farmFormData, contact_person: e.target.value })}
                 />
               </div>
-              
+
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="address">Address</Label>
                 <Textarea
                   id="address"
                   value={farmFormData.address || ''}
-                  onChange={(e) => setFarmFormData({...farmFormData, address: e.target.value})}
+                  onChange={(e) => setFarmFormData({ ...farmFormData, address: e.target.value })}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
                   value={farmFormData.email || ''}
-                  onChange={(e) => setFarmFormData({...farmFormData, email: e.target.value})}
+                  onChange={(e) => setFarmFormData({ ...farmFormData, email: e.target.value })}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone</Label>
                 <Input
                   id="phone"
                   value={farmFormData.phone || ''}
-                  onChange={(e) => setFarmFormData({...farmFormData, phone: e.target.value})}
+                  onChange={(e) => setFarmFormData({ ...farmFormData, phone: e.target.value })}
                 />
               </div>
-              
+
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="bio">Farm Bio</Label>
                 <Textarea
                   id="bio"
                   value={farmFormData.bio || ''}
-                  onChange={(e) => setFarmFormData({...farmFormData, bio: e.target.value})}
+                  onChange={(e) => setFarmFormData({ ...farmFormData, bio: e.target.value })}
                   rows={3}
                 />
               </div>
             </div>
-            
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setFarmModalOpen(false)}>
                 Cancel
@@ -812,71 +1072,71 @@ const FarmerDashboard = () => {
                 Add a new farm location to your account. Multiple farms are available with your current plan.
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="new-farm-name">Farm Name</Label>
                 <Input
                   id="new-farm-name"
                   value={newFarmFormData.name || ''}
-                  onChange={(e) => setNewFarmFormData({...newFarmFormData, name: e.target.value})}
+                  onChange={(e) => setNewFarmFormData({ ...newFarmFormData, name: e.target.value })}
                   placeholder="Enter farm name"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="new-contact-person">Contact Person</Label>
                 <Input
                   id="new-contact-person"
                   value={newFarmFormData.contact_person || ''}
-                  onChange={(e) => setNewFarmFormData({...newFarmFormData, contact_person: e.target.value})}
+                  onChange={(e) => setNewFarmFormData({ ...newFarmFormData, contact_person: e.target.value })}
                   placeholder="Enter contact person name"
                 />
               </div>
-              
+
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="new-address">Address</Label>
                 <Textarea
                   id="new-address"
                   value={newFarmFormData.address || ''}
-                  onChange={(e) => setNewFarmFormData({...newFarmFormData, address: e.target.value})}
+                  onChange={(e) => setNewFarmFormData({ ...newFarmFormData, address: e.target.value })}
                   placeholder="Enter complete farm address"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="new-email">Email</Label>
                 <Input
                   id="new-email"
                   type="email"
                   value={newFarmFormData.email || ''}
-                  onChange={(e) => setNewFarmFormData({...newFarmFormData, email: e.target.value})}
+                  onChange={(e) => setNewFarmFormData({ ...newFarmFormData, email: e.target.value })}
                   placeholder="Enter email address"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="new-phone">Phone</Label>
                 <Input
                   id="new-phone"
                   value={newFarmFormData.phone || ''}
-                  onChange={(e) => setNewFarmFormData({...newFarmFormData, phone: e.target.value})}
+                  onChange={(e) => setNewFarmFormData({ ...newFarmFormData, phone: e.target.value })}
                   placeholder="Enter phone number"
                 />
               </div>
-              
+
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="new-bio">Farm Bio</Label>
                 <Textarea
                   id="new-bio"
                   value={newFarmFormData.bio || ''}
-                  onChange={(e) => setNewFarmFormData({...newFarmFormData, bio: e.target.value})}
+                  onChange={(e) => setNewFarmFormData({ ...newFarmFormData, bio: e.target.value })}
                   rows={3}
                   placeholder="Describe your farm and what you grow"
                 />
               </div>
             </div>
-            
+
             <DialogFooter>
               <Button variant="outline" onClick={() => {
                 setAddFarmModalOpen(false);
@@ -888,6 +1148,393 @@ const FarmerDashboard = () => {
                 Add Farm
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Stall Modal */}
+        <Dialog open={addStallModalOpen} onOpenChange={setAddStallModalOpen}>
+          <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-center">Add New Stall</DialogTitle>
+            </DialogHeader>
+
+            <Card className="border-0 shadow-none bg-transparent">
+              <CardContent>
+                <form onSubmit={handleStallSubmission} className="space-y-4">
+                  {/* Step 1: basic info */}
+                  {stallStep === 1 && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="stall-name">Stall Name</Label>
+                        <Input
+                          id="stall-name"
+                          value={stallFormData.name}
+                          onChange={(e) => setStallFormData({ ...stallFormData, name: e.target.value })}
+                          placeholder="Enter stall name"
+                          className={stallErrors.name ? "border-destructive" : ""}
+                          disabled={isStallLoading}
+                        />
+                        {stallErrors.name && <p className="text-sm text-destructive">{stallErrors.name}</p>}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="stall-location">Location</Label>
+                        <div className="space-y-2">
+                          <MapboxAutocomplete
+                            value={stallFormData.location}
+                            onChange={(address, coordinates) => {
+                              setStallFormData({ ...stallFormData, location: address || '' });
+                              setStallCoordinates(coordinates || null);
+                              // clear validation error when user picks location
+                              if (address) setStallErrors((prev) => ({ ...prev, location: '' }));
+                            }}
+                            placeholder="Search for stall location or pin on map"
+                          />
+                          <MapboxMapPreview
+                            coordinates={stallCoordinates}
+                            onSelect={(coords, placeName) => {
+                              // coords is [lng, lat]
+                              setStallCoordinates(coords);
+                              if (placeName) {
+                                setStallFormData({ ...stallFormData, location: placeName });
+                                setStallErrors((prev) => ({ ...prev, location: '' }));
+                              }
+                            }}
+                          />
+                          {stallErrors.location && <p className="text-sm text-destructive">{stallErrors.location}</p>}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Geo-fence radius</Label>
+                        <div className="flex items-center gap-4">
+                          <div className="w-full">
+                            <Slider
+                              value={[stallFormData.fenceRadius || 75]}
+                              min={50}
+                              max={150}
+                              step={1}
+                              onValueChange={(val: number[]) => {
+                                setStallFormData({ ...stallFormData, fenceRadius: val?.[0] ?? 75 });
+                              }}
+                            />
+                          </div>
+                          <div className="w-20 text-right">
+                            <span className="text-sm font-medium">{stallFormData.fenceRadius ?? 75} m</span>
+                          </div>
+                        </div>
+                        <p className="text-sm text-muted-foreground">Set radius for geo-fencing around the stall (50m - 150m)</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Attendance Status</Label>
+                        <Select
+                          value={stallFormData.isAttended ? "attended" : "unattended"}
+                          onValueChange={(value) => setStallFormData({ ...stallFormData, isAttended: value === "attended" })}
+                          disabled={isStallLoading}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select attendance status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="attended">Attended</SelectItem>
+                            <SelectItem value="unattended">Unattended</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Select Inventory Items</Label>
+                        <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto border rounded p-2">
+                          {inventory && inventory.length > 0 ? (
+                            inventory.map((item) => (
+                              <label key={item.id} className="flex items-center gap-2">
+                                <Checkbox
+                                  checked={selectedInventoryIds.includes(item.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelectedInventoryIds((prev) => Array.from(new Set([...prev, item.id])));
+                                    } else {
+                                      setSelectedInventoryIds((prev) => prev.filter((id) => id !== item.id));
+                                    }
+                                  }}
+                                />
+                                <div className="text-sm">
+                                  <div className="font-medium">{item.product.title || item.id}</div>
+                                  <div className="text-muted-foreground text-xs">Qty: {item.quantity_available}</div>
+                                </div>
+                              </label>
+                            ))
+                          ) : (
+                            <p className="text-sm text-muted-foreground">No inventory items available.</p>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">Select inventory items to associate with this stall.</p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Step 2: operating hours & photos */}
+                  {stallStep === 2 && (
+                    <>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Operating Hours</Label>
+                          <Select
+                            value={stallFormData.selectedDay || "monday"}
+                            onValueChange={(value) => setStallFormData({ ...stallFormData, selectedDay: value })}
+                            disabled={isStallLoading}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select day" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="monday">Monday</SelectItem>
+                              <SelectItem value="tuesday">Tuesday</SelectItem>
+                              <SelectItem value="wednesday">Wednesday</SelectItem>
+                              <SelectItem value="thursday">Thursday</SelectItem>
+                              <SelectItem value="friday">Friday</SelectItem>
+                              <SelectItem value="saturday">Saturday</SelectItem>
+                              <SelectItem value="sunday">Sunday</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label>Hours</Label>
+                            <div className="flex items-center gap-3">
+                              <div className="text-sm text-muted-foreground">
+                                {stallFormData.operatingHours[stallFormData.selectedDay || 'monday']?.isOpen ? (
+                                  <span className="text-green-600">Open</span>
+                                ) : (
+                                  <span className="text-red-600">Closed</span>
+                                )}
+                              </div>
+                              <Switch
+                                checked={stallFormData.operatingHours[stallFormData.selectedDay || 'monday']?.isOpen}
+                                onCheckedChange={(checked) => {
+                                  const currentDay = stallFormData.selectedDay || 'monday';
+                                  const existing = stallFormData.operatingHours[currentDay];
+                                  // When enabling, ensure at least one interval exists
+                                  const intervals = existing?.intervals && existing.intervals.length > 0 ? existing.intervals : [{ start: '09:00', end: '17:00' }];
+                                  setStallFormData({
+                                    ...stallFormData,
+                                    operatingHours: {
+                                      ...stallFormData.operatingHours,
+                                      [currentDay]: {
+                                        ...existing,
+                                        intervals,
+                                        isOpen: !!checked
+                                      }
+                                    }
+                                  });
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            {stallFormData.operatingHours[stallFormData.selectedDay || 'monday']?.intervals?.map((interval, idx) => (
+                              <div key={idx} className="flex gap-2 items-center">
+                                <Input
+                                  type="time"
+                                  value={interval.start}
+                                  onChange={(e) => {
+                                    const currentDay = stallFormData.selectedDay || 'monday';
+                                    const newIntervals = (stallFormData.operatingHours[currentDay]?.intervals || []).map((it, i) => i === idx ? { ...it, start: e.target.value } : it);
+                                    setStallFormData({
+                                      ...stallFormData,
+                                      operatingHours: {
+                                        ...stallFormData.operatingHours,
+                                        [currentDay]: {
+                                          ...stallFormData.operatingHours[currentDay],
+                                          intervals: newIntervals,
+                                          isOpen: true
+                                        }
+                                      }
+                                    });
+                                  }}
+                                  className={stallErrors[`operatingHours.start.${idx}`] ? 'border-destructive' : ''}
+                                  disabled={isStallLoading || !stallFormData.operatingHours[stallFormData.selectedDay || 'monday']?.isOpen}
+                                />
+                                <span>to</span>
+                                <Input
+                                  type="time"
+                                  value={interval.end}
+                                  onChange={(e) => {
+                                    const currentDay = stallFormData.selectedDay || 'monday';
+                                    const newIntervals = (stallFormData.operatingHours[currentDay]?.intervals || []).map((it, i) => i === idx ? { ...it, end: e.target.value } : it);
+                                    setStallFormData({
+                                      ...stallFormData,
+                                      operatingHours: {
+                                        ...stallFormData.operatingHours,
+                                        [currentDay]: {
+                                          ...stallFormData.operatingHours[currentDay],
+                                          intervals: newIntervals,
+                                          isOpen: true
+                                        }
+                                      }
+                                    });
+                                  }}
+                                  className={stallErrors[`operatingHours.end.${idx}`] ? 'border-destructive' : ''}
+                                  disabled={isStallLoading || !stallFormData.operatingHours[stallFormData.selectedDay || 'monday']?.isOpen}
+                                />
+
+                                <div className="flex items-center gap-2">
+                                  {(stallFormData.operatingHours[stallFormData.selectedDay || 'monday']?.intervals?.length || 0) > 1 && (
+                                    <Button type="button" variant="destructive" onClick={() => {
+                                      const currentDay = stallFormData.selectedDay || 'monday';
+                                      const newIntervals = (stallFormData.operatingHours[currentDay]?.intervals || []).filter((_, i) => i !== idx);
+                                      setStallFormData({
+                                        ...stallFormData,
+                                        operatingHours: {
+                                          ...stallFormData.operatingHours,
+                                          [currentDay]: {
+                                            ...stallFormData.operatingHours[currentDay],
+                                            intervals: newIntervals
+                                          }
+                                        }
+                                      });
+                                    }}>Remove</Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+
+                            <div>
+                              <Button type="button" onClick={() => {
+                                const currentDay = stallFormData.selectedDay || 'monday';
+                                const newIntervals = [...(stallFormData.operatingHours[currentDay]?.intervals || []), { start: '09:00', end: '17:00' }];
+                                setStallFormData({
+                                  ...stallFormData,
+                                  operatingHours: {
+                                    ...stallFormData.operatingHours,
+                                    [currentDay]: {
+                                      ...stallFormData.operatingHours[currentDay],
+                                      intervals: newIntervals,
+                                      isOpen: true
+                                    }
+                                  }
+                                });
+                              }}>Add Interval</Button>
+                            </div>
+                          </div>
+                          {(stallErrors['operatingHours.start'] || stallErrors['operatingHours.end']) && (
+                            <p className="text-sm text-destructive">Please enter valid operating hours</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="stall-photos">Photos</Label>
+                        <Input
+                          id="stall-photos"
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || []);
+                            const total = files.length + (stallFormData.photos?.length || 0);
+                            if (total > 5) {
+                              toast({
+                                variant: "destructive",
+                                title: "Too many files",
+                                description: "You can upload a maximum of 5 photos"
+                              });
+                              return;
+                            }
+
+                            // Create preview URLs for the new files
+                            const newPreviews = files.map((f) => ({ file: f, url: URL.createObjectURL(f) }));
+
+                            setPhotoPreviews((prev) => [...prev, ...newPreviews]);
+                            setStallFormData({ ...stallFormData, photos: [...(stallFormData.photos || []), ...files] });
+                          }}
+                          className="cursor-pointer"
+                          disabled={isStallLoading}
+                        />
+                        <p className="text-sm text-muted-foreground">Upload photos of your stall (maximum 5 photos)</p>
+                        {photoPreviews.length > 0 && (
+                          <div className="mt-2 grid grid-cols-3 gap-2">
+                            {photoPreviews.map((p, idx) => (
+                              <div key={p.url} className="relative border rounded overflow-hidden">
+                                <img src={p.url} alt={`preview-${idx}`} className="w-full h-24 object-cover" />
+                                <button
+                                  type="button"
+                                  aria-label="Remove photo"
+                                  className="absolute top-1 right-1 bg-white/80 rounded-full p-1 text-sm"
+                                  onClick={() => {
+                                    // revoke url
+                                    URL.revokeObjectURL(p.url);
+                                    // remove from previews
+                                    setPhotoPreviews((prev) => prev.filter((x) => x.url !== p.url));
+                                    // remove from stallFormData.photos
+                                    setStallFormData((prev) => ({
+                                      ...prev,
+                                      photos: (prev.photos || []).filter((f) => f.name !== p.file.name || f.size !== p.file.size)
+                                    }));
+                                  }}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      {stallStep === 2 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setStallStep(1)}
+                          disabled={isStallLoading}
+                        >
+                          Back
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setAddStallModalOpen(false);
+                          setStallFormData({
+                            name: '',
+                            location: '',
+                            photos: [],
+                            isAttended: true,
+                            selectedDay: 'monday',
+                            operatingHours: {
+                              monday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+                              tuesday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+                              wednesday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+                              thursday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+                              friday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+                              saturday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+                              sunday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] }
+                            }
+                          });
+                          setPhotoPreviews([]);
+                          setStallStep(1);
+                        }}
+                        disabled={isStallLoading}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={isStallLoading}>
+                        {isStallLoading ? (stallStep === 1 ? 'Processing...' : 'Finalizing...') : (stallStep === 1 ? 'Next' : 'Finish')}
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
           </DialogContent>
         </Dialog>
       </main>
