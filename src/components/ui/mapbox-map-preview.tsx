@@ -6,12 +6,14 @@ import { supabase } from "@/integrations/supabase/client";
 interface MapboxMapPreviewProps {
   coordinates: [number, number] | null;
   className?: string;
+  onSelect?: (coordinates: [number, number], placeName?: string) => void;
 }
 
-export function MapboxMapPreview({ coordinates, className = "" }: MapboxMapPreviewProps) {
+export function MapboxMapPreview({ coordinates, className = "", onSelect }: MapboxMapPreviewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
+  const clickHandlerRef = useRef<((e: any) => void) | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
 
   // Fetch Mapbox token
@@ -77,6 +79,49 @@ export function MapboxMapPreview({ coordinates, className = "" }: MapboxMapPrevi
           .setLngLat(coordinates)
           .addTo(map.current);
       }
+
+      // Add click handler to allow pinning by tapping/clicking the map
+  const handleMapClick = async (e: any) => {
+        try {
+          const lngLat = e.lngLat;
+          const picked: [number, number] = [lngLat.lng, lngLat.lat];
+
+          // Move map and update marker
+          map.current?.flyTo({ center: picked, zoom: 12, duration: 700 });
+
+          if (marker.current) {
+            marker.current.remove();
+            marker.current = null;
+          }
+
+          marker.current = new mapboxgl.Marker().setLngLat(picked).addTo(map.current!);
+
+          // Optionally reverse geocode to get a human readable place name and call onSelect
+          let placeName: string | undefined = undefined;
+          if (mapboxToken) {
+            try {
+              const res = await fetch(
+                `https://api.mapbox.com/geocoding/v5/mapbox.places/${picked[0]},${picked[1]}.json?access_token=${mapboxToken}&limit=1`
+              );
+              if (res.ok) {
+                const data = await res.json();
+                placeName = data.features?.[0]?.place_name;
+              }
+            } catch (err) {
+              console.error('Reverse geocode failed:', err);
+            }
+          }
+
+          if (onSelect) {
+            onSelect(picked, placeName);
+          }
+        } catch (err) {
+          console.error('Error handling map click:', err);
+        }
+      };
+
+  clickHandlerRef.current = handleMapClick;
+  map.current.on('click', handleMapClick as any);
     } catch (error) {
       console.error('Error initializing map:', error);
     }
@@ -84,6 +129,13 @@ export function MapboxMapPreview({ coordinates, className = "" }: MapboxMapPrevi
     return () => {
       console.log('Cleaning up map...');
       if (map.current) {
+        try {
+          if (clickHandlerRef.current) {
+            map.current.off('click', clickHandlerRef.current as any);
+          }
+        } catch (e) {
+          // ignore
+        }
         map.current.remove();
         map.current = null;
       }
@@ -112,17 +164,16 @@ export function MapboxMapPreview({ coordinates, className = "" }: MapboxMapPrevi
     }
   }, [coordinates]);
 
-  if (!coordinates) {
-    return (
-      <div className={`h-48 bg-muted/30 rounded-lg flex items-center justify-center border-2 border-dashed border-muted ${className}`}>
-        <p className="text-muted-foreground text-sm">Select an address to preview location</p>
-      </div>
-    );
-  }
-
   return (
-    <div className={`h-48 rounded-lg overflow-hidden border ${className}`}>
+    <div className={`h-48 rounded-lg overflow-hidden border relative ${className}`}>
       <div ref={mapContainer} className="w-full h-full" />
+      {!coordinates && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="bg-white/80 px-3 py-2 rounded text-sm text-muted-foreground border">
+            Tap on the map to pick a location
+          </div>
+        </div>
+      )}
     </div>
   );
 }
