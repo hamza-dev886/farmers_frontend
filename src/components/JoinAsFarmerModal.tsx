@@ -61,6 +61,7 @@ interface JoinAsFarmerModalProps {
 export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [farmCoordinates, setFarmCoordinates] = useState<[number, number] | null>(null);
+  const [farmAddressInput, setFarmAddressInput] = useState<string>("");
   const [farmImageFile, setFarmImageFile] = useState<File | null>(null);
   const [farmImagePreview, setFarmImagePreview] = useState<string | null>(null);
   const [socialLinksCount, setSocialLinksCount] = useState(1);
@@ -428,9 +429,10 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                           <FormControl>
                             <div className="space-y-3">
                               <MapboxAutocomplete
-                                value={field.value}
+                                value={farmAddressInput || field.value}
                                 onChange={(address, coordinates) => {
                                   console.log('Form address changed:', address, 'Coordinates:', coordinates);
+                                  setFarmAddressInput(address || "");
                                   field.onChange(address);
                                   setFarmCoordinates(coordinates || null);
                                   console.log('Farm coordinates state set to:', coordinates);
@@ -438,7 +440,26 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                                 placeholder="Search for your farm address..."
                                 className="min-h-[40px]"
                               />
-                              <MapboxMapPreview coordinates={farmCoordinates} />
+                              <MapboxMapPreview
+                                coordinates={farmCoordinates}
+                                onSelect={(coords, placeName) => {
+                                  console.log('Map pick received:', coords, placeName);
+                                  setFarmCoordinates(coords);
+                                  // Update the visible autocomplete input so users see the picked address
+                                  if (placeName) {
+                                    setFarmAddressInput(placeName);
+                                  }
+                                  // Update form values for coordinates and address if available
+                                  try {
+                                    form.setValue('farmCoordinates', coords as unknown as number[]);
+                                    if (placeName) {
+                                      form.setValue('farmAddress', placeName);
+                                    }
+                                  } catch (e) {
+                                    console.error('Error setting form values from map pick:', e);
+                                  }
+                                }}
+                              />
                             </div>
                           </FormControl>
                           <FormMessage />
