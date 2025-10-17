@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { z } from 'zod';
@@ -27,7 +27,8 @@ import {
   TrendingUp,
   ShoppingCart,
   Wheat,
-  DollarSign
+  DollarSign,
+  Trash2
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -94,7 +95,7 @@ const FarmerDashboard = () => {
   const [farmData, setFarmData] = useState<FarmData[]>([]);
   const [selectedFarm, setSelectedFarm] = useState<FarmData | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [inventory, setInventory] = useState<Inventory[]>([]);
+  const [inventory, setInventory] = useState<any[]>([]);
   const [currentPlan, setCurrentPlan] = useState<CurrentPlan | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
@@ -102,12 +103,74 @@ const FarmerDashboard = () => {
     lowStockItems: 0,
     totalInventoryValue: 0
   });
+  const { farmId } = useParams<{ farmId: string }>();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const [farmModalOpen, setFarmModalOpen] = useState(false);
   const [addFarmModalOpen, setAddFarmModalOpen] = useState(false);
   const [addStallModalOpen, setAddStallModalOpen] = useState(false);
   const [isStallLoading, setIsStallLoading] = useState(false);
+  type Stall = {
+    id: string;
+    name: string;
+    location: string;
+    is_pickup: boolean;
+    operating_hours: {
+      [key: string]: {
+        isOpen: boolean;
+        intervals: Array<{ start: string; end: string }>;
+      };
+    };
+    stall_images?: string[];
+    pickup_from?: string;
+    pickup_to?: string;
+    capacityPerSlot?: number;
+    prep_buffer?: string;
+    fence_radius_m?: number;
+    longitude?: number;
+    latitude?: number;
+    created_at: string;
+  };
+
+  const [stalls, setStalls] = useState<Stall[]>([]);
+  const [stallToDelete, setStallToDelete] = useState<Stall | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const handleDeleteStall = async () => {
+    if (!stallToDelete) return;
+
+    try {
+
+      console.log('Deleting stall with id:', stallToDelete.id);
+      const { data, error } = await (supabase as any)
+        .from('farm_stalls')
+        .delete()
+        .eq('id', stallToDelete.id)
+        .select();
+
+        console.log('Delete stall response data:', data);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Stall deleted successfully."
+      });
+
+      // Refresh the stalls list
+      await fetchStalls();
+    } catch (error) {
+      console.error('Error deleting stall:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete stall."
+      });
+    } finally {
+      setStallToDelete(null);
+      setDeleteDialogOpen(false);
+    }
+  };
 
   // Stall validation schema
   const stallSchema = z.object({
@@ -137,9 +200,13 @@ const FarmerDashboard = () => {
     name: string;
     location: string;
     photos: File[];
-    isAttended: boolean;
+    isPickup: boolean;
     selectedDay: string;
     fenceRadius?: number;
+    pickupFrom?: string;
+    prep_buffer?: string;
+    pickupTo?: string;
+    capacityPerSlot?: number;
     operatingHours: {
       [key: string]: DayOperatingHours;
     };
@@ -149,17 +216,21 @@ const FarmerDashboard = () => {
     name: '',
     location: '',
     photos: [],
-    isAttended: true,
+    isPickup: true,
     fenceRadius: 75,
     selectedDay: 'monday',
+    pickupFrom: '09:00',
+    pickupTo: '17:00',
+    capacityPerSlot: 0,
+    prep_buffer: '',
     operatingHours: {
-      monday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
-      tuesday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
-      wednesday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
-      thursday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
-      friday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
-      saturday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
-      sunday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
+      monday: { isOpen: false, intervals: [{ start: '09:00', end: '17:00' }] },
+      tuesday: { isOpen: false, intervals: [{ start: '09:00', end: '17:00' }] },
+      wednesday: { isOpen: false, intervals: [{ start: '09:00', end: '17:00' }] },
+      thursday: { isOpen: false, intervals: [{ start: '09:00', end: '17:00' }] },
+      friday: { isOpen: false, intervals: [{ start: '09:00', end: '17:00' }] },
+      saturday: { isOpen: false, intervals: [{ start: '09:00', end: '17:00' }] },
+      sunday: { isOpen: false, intervals: [{ start: '09:00', end: '17:00' }] },
     }
   });
   const [stallErrors, setStallErrors] = useState<Record<string, string>>({});
@@ -179,7 +250,9 @@ const FarmerDashboard = () => {
   const stallStep1Schema = z.object({
     name: z.string().min(1, "Stall name is required"),
     location: z.string().min(1, "Location is required"),
-    isAttended: z.boolean()
+    isPickup: z.boolean(),
+    capacityPerSlot: z.number().optional(),
+    prep_buffer: z.string().optional()
   });
 
   const handleStallSubmission = async (e: React.FormEvent) => {
@@ -190,7 +263,9 @@ const FarmerDashboard = () => {
         const validated = stallStep1Schema.parse({
           name: stallFormData.name,
           location: stallFormData.location,
-          isAttended: stallFormData.isAttended
+          isPickup: stallFormData.isPickup,
+          capacityPerSlot: stallFormData.capacityPerSlot,
+          prep_buffer: stallFormData.prep_buffer
         });
         setStallErrors({});
         setStallStep(2);
@@ -214,9 +289,9 @@ const FarmerDashboard = () => {
     try {
       if (!selectedFarm?.id) throw new Error('No farm selected');
 
-  // Upload photos to storage and collect filenames to store in DB
-  const photoNames: string[] = [];
-  for (const photo of stallFormData.photos || []) {
+      // Upload photos to storage and collect filenames to store in DB
+      const photoNames: string[] = [];
+      for (const photo of stallFormData.photos || []) {
         // derive a safe extension, fallback to png
         let fileExt = (photo.name || '').split('.').pop() || '';
         fileExt = fileExt.match(/^[a-zA-Z0-9]+$/) ? fileExt : 'png';
@@ -259,7 +334,6 @@ const FarmerDashboard = () => {
       const payload: any = {
         name: stallFormData.name,
         location: stallFormData.location,
-        // is_attended: stallFormData.isAttended,
         operating_hours: stallFormData.operatingHours,
         farm_id: selectedFarm.id
       };
@@ -276,27 +350,46 @@ const FarmerDashboard = () => {
         payload.longitude = stallCoordinates[0];
         payload.latitude = stallCoordinates[1];
       }
-  if (photoNames.length > 0) payload.stall_images = photoNames;
 
-      console.log('Stall payload:', payload);
+      if (stallFormData.isPickup) {
+        payload.is_pickup = true;
+        payload.pickup_from = stallFormData.pickupFrom;
+        payload.pickup_to = stallFormData.pickupTo;
+        payload.capacityPerSlot = stallFormData.capacityPerSlot;
+        payload.prep_buffer = stallFormData.prep_buffer;
+      }
+
+      if (!stallFormData.isPickup) {
+        payload.is_pickup = false;
+      }
+
+      if (photoNames.length > 0) payload.stall_images = photoNames;
+
+      console.log('Stall insert payload:', payload);
 
       const { error } = await (supabase as any)
         .from('farm_stalls')
         .insert(payload);
 
-        console.log('Stall insert response error:', error );
+      console.log('Stall insert response error:', error);
 
       if (error) throw error;
 
       toast({ title: 'Success', description: 'Stall created successfully!' });
       setAddStallModalOpen(false);
+      await fetchStalls(); // Refresh the stalls list
       // reset
       setStallFormData({
         name: '',
         location: '',
         photos: [],
-        isAttended: true,
+        isPickup: true,
         selectedDay: 'monday',
+        fenceRadius: 75,
+        pickupFrom: '09:00',
+        pickupTo: '17:00',
+        capacityPerSlot: 0,
+        prep_buffer: '',
         operatingHours: {
           monday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
           tuesday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
@@ -374,9 +467,9 @@ const FarmerDashboard = () => {
     // fetch both lists in parallel
     const load = async () => {
       try {
-        await Promise.all([fetchProducts(), fetchInventory()]);
+        await Promise.all([fetchProducts(), fetchInventory(), fetchStalls()]);
       } catch (err) {
-        console.error('Error loading products/inventory after selecting farm:', err);
+        console.error('Error loading farm data:', err);
       }
     };
 
@@ -393,7 +486,7 @@ const FarmerDashboard = () => {
         .select('*')
         .eq('farmer_id', userId)
         .order('created_at', { ascending: false });
-
+        console.log('Fetched farm data:', data);
       if (error) throw error;
       setFarmData(data || []);
       if (data && data.length > 0 && !selectedFarm) {
@@ -452,34 +545,55 @@ const FarmerDashboard = () => {
     }
   };
 
+  const fetchStalls = async () => {
+    if (!user || !selectedFarm) return;
+
+    try {
+      const { data, error } = await (supabase as any)
+        .from('farm_stalls')
+        .select('*')
+        .eq('farm_id', selectedFarm.id);
+
+        console.log('Fetched stalls data:', data);
+
+      if (error) throw error;
+      setStalls(data || []);
+    } catch (error) {
+      console.error('Error fetching stalls:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load stalls."
+      });
+    }
+  };
+
   const fetchInventory = async () => {
     if (!user || !selectedFarm) return;
 
     try {
       const { data, error } = await supabase
-        .from('inventory_tracking')
+        .from('farm_products')
         .select(`
-          *,
-          product:variant_id (
-          *
-          )`)
+          product_id,
+          product (
+            id,
+            title,
+            handle,
+            description,
+            status,
+            created_at,
+            updated_at
+          )
+        `)
         .eq('farm_id', selectedFarm.id);
 
-        console.log('Inventory fetch response:', data );
+      console.log('Inventory fetch response:', data, selectedFarm.id);
 
       if (error) throw error;
 
       setInventory(data || []);
 
-      // Update stats for low stock items
-      const lowStock = (data || []).filter(item =>
-        item.quantity_available <= item.low_stock_threshold
-      ).length;
-
-      setStats(prev => ({
-        ...prev,
-        lowStockItems: lowStock
-      }));
     } catch (error) {
       console.error('Error fetching inventory:', error);
     }
@@ -713,11 +827,67 @@ const FarmerDashboard = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
-                      <TableHead>Attended Status</TableHead>
+                      <TableHead>Pickup Status</TableHead>
                       <TableHead>Operating Hours</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
+                  <TableBody>
+                    {stalls.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground">
+                          No stalls found. Add your first stall to get started.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      stalls.map((stall) => (
+                        <TableRow key={stall.id}>
+                          <TableCell>{stall.name}</TableCell>
+                          <TableCell>
+                            <Badge variant={stall.is_pickup ? "default" : "secondary"}>
+                              {stall.is_pickup ? "Pickup Available" : "No Pickup"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {stall.operating_hours && Object.entries(stall.operating_hours).some(([_, day]) => day.isOpen) ? (
+                              <div className="text-sm">
+                                {Object.entries(stall.operating_hours)
+                                  .filter(([_, day]) => day.isOpen)
+                                  .map(([dayName, day]) => (
+                                    <div key={dayName} className="capitalize">
+                                      {dayName}: {day.intervals?.[0]?.start} - {day.intervals?.[0]?.end}
+                                    </div>
+                                  ))
+                                  .slice(0, 2)}
+                                {Object.entries(stall.operating_hours).filter(([_, day]) => day.isOpen).length > 2 && (
+                                  <span className="text-muted-foreground">...</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">No operating hours set</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button variant="outline" size="icon">
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="icon"
+                                onClick={() => {
+                                  setStallToDelete(stall);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
                 </Table>
               </CardContent>
             </Card>
@@ -1227,41 +1397,105 @@ const FarmerDashboard = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <Label>Attendance Status</Label>
+                        <Label>Pickup Status</Label>
                         <Select
-                          value={stallFormData.isAttended ? "attended" : "unattended"}
-                          onValueChange={(value) => setStallFormData({ ...stallFormData, isAttended: value === "attended" })}
+                          value={stallFormData.isPickup ? "available" : "not_available"}
+                          onValueChange={(value) => setStallFormData({ ...stallFormData, isPickup: value === "available" })}
                           disabled={isStallLoading}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Select attendance status" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="attended">Attended</SelectItem>
-                            <SelectItem value="unattended">Unattended</SelectItem>
+                            <SelectItem value="available">Available</SelectItem>
+                            <SelectItem value="not_available">Not Available</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
+                      {stallFormData.isPickup &&
+                        <>
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label>From</Label>
+                                <Input
+                                  type="time"
+                                  value={stallFormData.pickupFrom || '09:00'}
+                                  onChange={(e) => {
+                                    setStallFormData({
+                                      ...stallFormData,
+                                      pickupFrom: e.target.value
+                                    });
+                                  }}
+                                  className={stallErrors.pickupFrom ? 'border-destructive' : ''}
+                                  disabled={isStallLoading}
+                                />
+                                {stallErrors.pickupFrom && <p className="text-sm text-destructive">{stallErrors.pickupFrom}</p>}
+                              </div>
+                              <div>
+                                <Label>To</Label>
+                                <Input
+                                  type="time"
+                                  value={stallFormData.pickupTo || '17:00'}
+                                  onChange={(e) => {
+                                    setStallFormData({
+                                      ...stallFormData,
+                                      pickupTo: e.target.value
+                                    });
+                                  }}
+                                  className={stallErrors.pickupTo ? 'border-destructive' : ''}
+                                  disabled={isStallLoading}
+                                />
+                                {stallErrors.pickupTo && <p className="text-sm text-destructive">{stallErrors.pickupTo}</p>}
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="stall-name">Capacity per slot</Label>
+                              <Input
+                                id="capacity-per-slot"
+                                type="number"
+                                value={stallFormData.capacityPerSlot}
+                                onChange={(e) => setStallFormData({ ...stallFormData, capacityPerSlot: Number(e.target.value) })}
+                                placeholder="Enter capacity per slot"
+                                className={stallErrors.capacityPerSlot ? "border-destructive" : ""}
+                                disabled={isStallLoading}
+                              />
+                              {stallErrors.capacityPerSlot && <p className="text-sm text-destructive">{stallErrors.capacityPerSlot}</p>}
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="stall-name">Prep Buffer</Label>
+                              <Input
+                                id="stall-name"
+                                value={stallFormData.prep_buffer}
+                                onChange={(e) => setStallFormData({ ...stallFormData, prep_buffer: e.target.value })}
+                                placeholder="Enter prep buffer"
+                                className={stallErrors.name ? "border-destructive" : ""}
+                                disabled={isStallLoading}
+                              />
+                              {stallErrors.prep_buffer && <p className="text-sm text-destructive">{stallErrors.prep_buffer}</p>}
+                            </div>
+                          </div>
+                        </>}
+
                       <div className="space-y-2">
-                        <Label>Select Inventory Items</Label>
-                        <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto border rounded p-2">
+                        <Label>Select Products</Label>
+                        <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto p-2 bg-gray-50 border border-gray-200 rounded-md">
                           {inventory && inventory.length > 0 ? (
-                            inventory.map((item) => (
-                              <label key={item.id} className="flex items-center gap-2">
+                            inventory.map((item,index) => (
+                              <label key={index} className="flex items-center gap-2 border rounded-md p-2 hover:bg-accent cursor-pointer">
                                 <Checkbox
-                                  checked={selectedInventoryIds.includes(item.id)}
+                                  checked={selectedInventoryIds.includes(item.product.id)}
                                   onCheckedChange={(checked) => {
                                     if (checked) {
-                                      setSelectedInventoryIds((prev) => Array.from(new Set([...prev, item.id])));
+                                      setSelectedInventoryIds((prev) => Array.from(new Set([...prev, item.product.id])));
                                     } else {
-                                      setSelectedInventoryIds((prev) => prev.filter((id) => id !== item.id));
+                                      setSelectedInventoryIds((prev) => prev.filter((id) => id !== item.product.id));
                                     }
                                   }}
                                 />
                                 <div className="text-sm">
                                   <div className="font-medium">{item.product.title || item.id}</div>
-                                  <div className="text-muted-foreground text-xs">Qty: {item.quantity_available}</div>
                                 </div>
                               </label>
                             ))
@@ -1269,7 +1503,6 @@ const FarmerDashboard = () => {
                             <p className="text-sm text-muted-foreground">No inventory items available.</p>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">Select inventory items to associate with this stall.</p>
                       </div>
                     </>
                   )}
@@ -1508,8 +1741,10 @@ const FarmerDashboard = () => {
                             name: '',
                             location: '',
                             photos: [],
-                            isAttended: true,
+                            isPickup: true,
                             selectedDay: 'monday',
+                            pickupFrom: '09:00',
+                            pickupTo: '17:00',
                             operatingHours: {
                               monday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
                               tuesday: { isOpen: true, intervals: [{ start: '09:00', end: '17:00' }] },
@@ -1537,6 +1772,24 @@ const FarmerDashboard = () => {
             </Card>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete the stall "{stallToDelete?.name}". This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setStallToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteStall} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );
