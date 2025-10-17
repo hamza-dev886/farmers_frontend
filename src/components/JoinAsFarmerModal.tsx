@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 const farmerApplicationSchema = z.object({
+  joiningType: z.enum(["farm", "stall"]),
   contactPerson: z.string().min(2, "Contact person name must be at least 2 characters"),
   email: z.string().min(1, "Email is required"),
   phone: z.string()
@@ -25,6 +26,12 @@ const farmerApplicationSchema = z.object({
       (value) => /^\+?1?\s*\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}$/.test(value),
       "Please enter a valid US phone number (e.g. +1 (555) 123-4567)"
     ),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
+  confirmPassword: z.string(),
   farmName: z.string().min(2, "Farm name must be at least 2 characters"),
   farmAddress: z.string().min(10, "Please provide a detailed address"),
   farmType: z.string(),
@@ -37,6 +44,9 @@ const farmerApplicationSchema = z.object({
   }).optional()).nullable(),
   products: z.array(z.string()).min(1, "Please select at least one product type"),
   termsAccepted: z.boolean().refine(val => val === true, "You must accept the terms and conditions"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
 type FarmerApplicationForm = z.infer<typeof farmerApplicationSchema>;
@@ -90,11 +100,14 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
   const form = useForm<FarmerApplicationForm>({
     resolver: zodResolver(farmerApplicationSchema),
     defaultValues: {
+      joiningType: 'farm',
       contactPerson: "",
       email: "",
       phone: "",
       farmName: "",
       farmAddress: "",
+      password: "",
+      confirmPassword: "",
       farmType: "",
       farmCoordinates: undefined,
       farmBio: "",
@@ -104,22 +117,27 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
     },
   });
 
+  const joiningType = form.watch('joiningType');
+  const isFarm = joiningType === 'farm';
+
   const onSubmit = async (data: FarmerApplicationForm) => {
     setIsSubmitting(true);
 
     try {
       // Generate temporary password
-      const tempPassword = generatePassword();
+      // const tempPassword = generatePassword();
 
       // Create user account with temporary password using regular signup
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
-        password: tempPassword,
+        password: data.password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: data.contactPerson,
-            role: 'farmer',
+            role: "farmer",
+            type: data.joiningType,
             password_expired: true
           }
         }
@@ -166,10 +184,9 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
         });
 
       if (applicationError) throw applicationError;
-      console.log("Temp password", tempPassword)
       toast({
         title: "Application submitted successfully!",
-        description: `Your farmer application has been submitted with email: ${data.email}. Your temporary password is: ${tempPassword}. Please save this and check your email for confirmation.`,
+        description: `Your application has been submitted with email: ${data.email}.Please check your email for confirmation.`,
         duration: 15000,
       });
 
@@ -221,12 +238,27 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
             <DialogHeader className="text-center mb-6">
               <DialogTitle className="text-2xl text-farm-green flex items-center justify-center gap-2">
                 <Leaf className="h-6 w-6" />
-                Join Our Farming Community
+                {isFarm ? 'Join Our Farming Community' : 'Join Our Stall Network'}
               </DialogTitle>
               <DialogDescription className="text-lg max-w-2xl mx-auto">
-                Join our platform to connect directly with local customers, showcase your fresh produce,
-                and grow your farming business. We support sustainable agriculture and fair trade practices.
+                {isFarm ? (
+                  <>Join our platform to connect directly with local customers, showcase your fresh produce, and grow your farming business. We support sustainable agriculture and fair trade practices.</>
+                ) : (
+                  <>Join as a stall to sell products directly at market stalls and pop-ups. Connect with local farms, manage inventory, and meet customers in person.</>
+                )}
               </DialogDescription>
+              <div className="flex justify-center gap-3 my-4">
+                {([['farm', 'Join as Farm'], ['stall', 'Join as Stall']] as [string, string][]).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => form.setValue('joiningType', value as 'farm' | 'stall')}
+                    className={`px-4 py-2 rounded-full font-semibold ${form.watch('joiningType') === value ? 'bg-farm-green text-white' : 'bg-muted text-muted-foreground'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </DialogHeader>
 
             {/* Application Form */}
@@ -285,7 +317,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                               {...field}
                               onChange={(e) => {
                                 let value = e.target.value.replace(/\D/g, "");
-                                 value = value.slice(0, 11);
+                                value = value.slice(0, 11);
                                 if (value.length > 0) {
                                   if (value.startsWith("1")) {
                                     value = value.slice(1);
@@ -314,15 +346,51 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                       )}
                     />
 
+                      <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password <span className="text-destructive">*</span></FormLabel>
+                          <FormControl>
+                            <Input
+                              type="password"
+                              placeholder="*********"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                      <FormField
+                      control={form.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Confirm password <span className="text-destructive">*</span></FormLabel>
+                          <FormControl>
+                            <Input
+                              type="password"
+                              placeholder="*********"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
                     <FormField
                       control={form.control}
                       name="farmType"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Farm Type <span className="text-destructive">*</span></FormLabel>
+                          <FormLabel>{isFarm ? 'Farm Type' : 'Stall Type'} <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="e.g. Dairy"
+                              placeholder={isFarm ? "e.g. Dairy" : "e.g. Market Stall Type"}
                               {...field}
                               value={typeof field.value === 'string' ? field.value : ''}
                             />
@@ -339,62 +407,64 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                         Social Media Links
                       </h3>
                       <div className="space-y-4">
-                        {[...Array(socialLinksCount)].map((_, index) => (
-                          <div key={index} className="flex flex-col">
-                            <div className="flex flex-row gap-3">
-                              <div className="flex-1 space-y-2">
-                                <select
-                                  className="w-full rounded-md border border-input bg-background px-3 h-10 text-sm"
-                                  value={form.watch(`socialLinks.${index}.platform`)}
-                                  onChange={(e) => {
-                                    form.setValue(`socialLinks.${index}.platform`, e.target.value as "facebook" | "twitter" | "instagram");
+                        {[...Array(socialLinksCount)].map((_, index) => {
+                          return (
+                            <div key={index} className="flex flex-col">
+                              <div className="flex flex-row gap-3">
+                                <div className="flex-1 space-y-2">
+                                  <select
+                                    className="w-full rounded-md border border-input bg-background px-3 h-10 text-sm"
+                                    value={form.watch(`socialLinks.${index}.platform`)}
+                                    onChange={(e) => {
+                                      form.setValue(`socialLinks.${index}.platform`, e.target.value as "facebook" | "twitter" | "instagram");
+                                    }}
+                                  >
+                                    {socialPlatforms.map((platform) => (
+                                      <option key={platform.value} value={platform.value}>
+                                        {platform.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <input
+                                    type="url"
+                                    placeholder="Enter social media profile URL"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                    {...form.register(`socialLinks.${index}.url`)}
+                                  />
+                                  {form.formState.errors.socialLinks?.[index]?.url && (
+                                    <p className="text-sm text-destructive">{form.formState.errors.socialLinks[index]?.url?.message}</p>
+                                  )}
+                                </div>
+                                <div className="flex gap-2 mt-2">
+                                  {index > 0 && (
+                                    <X className="h-4 w-4 text-black"
+                                      onClick={() => {
+                                        setSocialLinksCount(prev => prev - 1);
+                                        const currentLinks = form.getValues("socialLinks") || [];
+                                        currentLinks.splice(index, 1);
+                                        form.setValue("socialLinks", currentLinks);
+                                      }} />
+                                  )}
+                                </div>
+                              </div>
+                              {(index+1) === socialLinksCount && index < 2 && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-10 w-36 mt-3 bg-farm-green text-white"
+                                  onClick={() => {
+                                    setSocialLinksCount(prev => prev + 1);
+                                    const currentLinks = form.getValues("socialLinks") || [];
+                                    form.setValue("socialLinks", [...currentLinks, { platform: "facebook", url: "" }]);
                                   }}
                                 >
-                                  {socialPlatforms.map((platform) => (
-                                    <option key={platform.value} value={platform.value}>
-                                      {platform.label}
-                                    </option>
-                                  ))}
-                                </select>
-                                <input
-                                  type="url"
-                                  placeholder="Enter social media profile URL"
-                                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                                  {...form.register(`socialLinks.${index}.url`)}
-                                />
-                                {form.formState.errors.socialLinks?.[index]?.url && (
-                                  <p className="text-sm text-destructive">{form.formState.errors.socialLinks[index]?.url?.message}</p>
-                                )}
-                              </div>
-                              <div className="flex gap-2 mt-2">
-                                {index > 0 && (
-                                  <X className="h-4 w-4 text-black"
-                                    onClick={() => {
-                                      setSocialLinksCount(prev => prev - 1);
-                                      const currentLinks = form.getValues("socialLinks") || [];
-                                      currentLinks.splice(index, 1);
-                                      form.setValue("socialLinks", currentLinks);
-                                    }} />
-                                )}
-                              </div>
+                                  <Plus className="h-4 w-4" />    Add Social link
+                                </Button>
+                              )}
                             </div>
-                            {index === socialLinksCount && index < 2 && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                className="h-10 w-36 mt-3 bg-farm-green text-white"
-                                onClick={() => {
-                                  setSocialLinksCount(prev => prev + 1);
-                                  const currentLinks = form.getValues("socialLinks") || [];
-                                  form.setValue("socialLinks", [...currentLinks, { platform: "facebook", url: "" }]);
-                                }}
-                              >
-                                <Plus className="h-4 w-4" />    Add Social link
-                              </Button>
-                            )}
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </div>
                   </div>
@@ -403,7 +473,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-farm-green flex items-center gap-2">
                       <Building className="h-5 w-5" />
-                      Farm Information
+                      {isFarm ? 'Farm Information' : 'Stall Information'}
                     </h3>
 
                     <FormField
@@ -411,9 +481,9 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                       name="farmName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Farm Name <span className="text-destructive">*</span></FormLabel>
+                          <FormLabel>{isFarm ? 'Farm Name' : 'Stall Name'} <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g., Green Valley Farm" {...field} />
+                            <Input placeholder={isFarm ? "e.g., Green Valley Farm" : "e.g., Downtown Market Stall"} {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -425,7 +495,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                       name="farmAddress"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Farm Address <span className="text-destructive">*</span></FormLabel>
+                          <FormLabel>{isFarm ? 'Farm Address' : 'Stall Address'} <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <div className="space-y-3">
                               <MapboxAutocomplete
@@ -469,7 +539,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                     <div className="flex justify-center">
                       <div className="flex-1 flex flex-col items-center justify-center bg-farm-cream/60 rounded-lg p-4 border border-farm-green-light">
                         <FormLabel className="font-semibold text-farm-green flex items-center gap-2 mb-2 justify-center">
-                          <Wheat className="h-5 w-5" /> Farm Logo
+                          <Wheat className="h-5 w-5" /> {isFarm ? 'Farm Logo' : 'Stall Logo'}
                         </FormLabel>
                         <div className="flex flex-col items-center gap-2 justify-center">
                           <div className="w-24 h-24 rounded-full bg-farm-green/10 flex items-center justify-center mb-2 border border-farm-green-light overflow-hidden">
@@ -513,7 +583,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                               onClick={() => { setFarmImageFile(null); setFarmImagePreview(null); }}
                             >Remove</Button>
                           )}
-                          <span className="text-xs text-muted-foreground text-center mt-2">Upload a clear image of your farm.<br />Supported formats: JPG, PNG, GIF.</span>
+                          <span className="text-xs text-muted-foreground text-center mt-2">Upload a clear image of your {isFarm ? 'farm' : 'stall'}.<br />Supported formats: JPG, PNG, GIF.</span>
                         </div>
                       </div>
                     </div>
@@ -524,7 +594,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-farm-green flex items-center gap-2">
                     <Leaf className="h-5 w-5" />
-                    About Your Farm
+                    {isFarm ? 'About Your Farm' : 'About Your Stall'}
                   </h3>
 
                   <FormField
@@ -532,10 +602,10 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                     name="farmBio"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Farm Description <span className="text-destructive">*</span></FormLabel>
+                        <FormLabel>{isFarm ? 'Farm Description' : 'Stall Description'} <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Tell us about your farm, farming practices, history, sustainability efforts, and what makes your products special..."
+                            placeholder={isFarm ? "Tell us about your farm, farming practices, history, sustainability efforts, and what makes your products special..." : "Tell us about your stall, where you operate, typical events/markets, and what makes your offerings unique..."}
                             className="min-h-[100px]"
                             {...field}
                           />
@@ -549,7 +619,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                 {/* Products Section */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-farm-green">Products You Offer <span className="text-destructive">*</span></h3>
-                  <p className="text-sm text-muted-foreground">Select all product types that apply to your farm:</p>
+                  <p className="text-sm text-muted-foreground">Select all product types that apply to your {isFarm ? 'farm' : 'stall'}:</p>
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {productOptions.map((product) => (
@@ -645,8 +715,9 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                     2
                   </div>
                   <h4 className="font-semibold mb-1 text-sm">Farm Verification</h4>
+                  <h4 className="font-semibold mb-1 text-sm">{isFarm ? 'Farm Verification' : 'Stall Verification'}</h4>
                   <p className="text-xs text-muted-foreground">
-                    Approved applicants undergo farm verification process
+                    Approved applicants undergo {isFarm ? 'farm' : 'stall'} verification process
                   </p>
                 </div>
                 <div className="text-center">
@@ -655,7 +726,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                   </div>
                   <h4 className="font-semibold mb-1 text-sm">Get Started</h4>
                   <p className="text-xs text-muted-foreground">
-                    Set up your farm profile and start connecting with customers
+                    Set up your {isFarm ? 'farm' : 'stall'} profile and start connecting with customers
                   </p>
                 </div>
               </div>
