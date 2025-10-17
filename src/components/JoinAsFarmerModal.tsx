@@ -174,6 +174,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
           farm_name: data.farmName,
           farm_address: data.farmAddress,
           farm_type: data.farmType,
+          type: data.joiningType,
           farm_coordinates: farmCoordinates,
           farm_bio: data.farmBio,
           products: data.products,
