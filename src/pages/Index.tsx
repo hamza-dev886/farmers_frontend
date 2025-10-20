@@ -15,6 +15,7 @@ import { useViewMode } from "@/hooks/useViewMode";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useStore } from "@/store/store";
 
 interface Farm {
   id: string;
@@ -34,6 +35,20 @@ const Index = () => {
   const [showFilters, setShowFilters] = useState(false);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+
+  const { setLocationCordinates } = useStore(state => state)
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const { latitude, longitude } = position.coords;
+        setLocationCordinates({
+          lat:latitude,
+          lng: longitude
+        })
+      });
+    }
+  }, []);
 
   // Check if user is admin or farmer and redirect
   useEffect(() => {
