@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle, XCircle, Eye, Clock, Users, FileText, TrendingUp, Plus, Edit, Trash, Mail, Send } from "lucide-react";
+import { CheckCircle, XCircle, Eye, Clock, FileText, TrendingUp, Plus, Edit, Trash, Mail, Send, User as UserIcon, MapPin, Info, Calendar, Check, X } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { User } from "@supabase/supabase-js";
 
@@ -112,6 +112,7 @@ const AdminDashboard = () => {
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'delete' | 'confirm-email' | 'resend-email' | null>(null);
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [planChangeModalOpen, setPlanChangeModalOpen] = useState(false);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
   const [planFormData, setPlanFormData] = useState<Partial<PricingPlan>>({});
   const [newPlanId, setNewPlanId] = useState<string>('');
   const [editingPlan, setEditingPlan] = useState<string | null>(null);
@@ -769,7 +770,7 @@ const AdminDashboard = () => {
                               size="sm"
                               onClick={() => {
                                 setSelectedApplication(application);
-                                // You could implement a detailed view modal here
+                                setViewModalOpen(true);
                               }}
                             >
                               <Eye className="h-4 w-4" />
@@ -1345,9 +1346,200 @@ const AdminDashboard = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* View Application Modal */}
+        <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
+          <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
+            <DialogHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
+                  <FileText className="h-6 w-6 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <DialogTitle className="text-xl truncate">Application Details</DialogTitle>
+                  <DialogDescription className="text-muted-foreground break-words">
+                    Complete information about the farmer application
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            
+            {selectedApplication && (
+              <div className="space-y-4">
+                {/* Basic Information Card */}
+                <Card className="border-l-4 border-l-blue-500">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <UserIcon className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                      <CardTitle className="text-lg truncate">Basic Information</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-3">
+                          <UserIcon className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <Label className="text-sm font-medium text-muted-foreground">Contact Person</Label>
+                            <p className="text-sm font-semibold text-foreground mt-1 break-words">{selectedApplication.contact_person}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start gap-3">
+                          <Mail className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <Label className="text-sm font-medium text-muted-foreground">Email Address</Label>
+                            <p className="text-sm font-semibold text-foreground mt-1 break-all">{selectedApplication.email}</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-3">
+                          <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <Label className="text-sm font-medium text-muted-foreground">Phone Number</Label>
+                            <p className="text-sm font-semibold text-foreground mt-1 break-words">{selectedApplication.phone}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start gap-3">
+                          <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <Label className="text-sm font-medium text-muted-foreground">Farm Name</Label>
+                            <p className="text-sm font-semibold text-foreground mt-1 break-words">{selectedApplication.farm_name}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Farm Details Card */}
+                <Card className="border-l-4 border-l-green-500">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-5 w-5 text-green-600 flex-shrink-0" />
+                      <CardTitle className="text-lg truncate">Farm Details</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <Label className="text-sm font-medium text-muted-foreground">Farm Address</Label>
+                        <p className="text-sm font-semibold text-foreground mt-1 break-words">{selectedApplication.farm_address}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-3">
+                      <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <Label className="text-sm font-medium text-muted-foreground">Farm Bio</Label>
+                        <div className="mt-1 p-4 bg-muted/30 rounded-lg border min-h-[60px]">
+                          <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words break-all">
+                            {selectedApplication.farm_bio || 'No bio provided'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-3">
+                      <FileText className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <Label className="text-sm font-medium text-muted-foreground">Products Offered</Label>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {selectedApplication.products.map((product, index) => (
+                            <Badge key={index} variant="default" className="bg-green-100 text-green-800 hover:bg-green-200 px-2 py-1 text-xs break-words max-w-full flex-shrink-0">
+                              <Check className="h-3 w-3 mr-1 flex-shrink-0" />
+                              <span className="truncate inline-block max-w-[120px]">{product}</span>
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Application Status Card */}
+                <Card className="border-l-4 border-l-orange-500">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-orange-600 flex-shrink-0" />
+                      <CardTitle className="text-lg truncate">Application Status</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-3 rounded-lg border border-orange-200 w-full">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Info className="h-4 w-4 text-orange-600 flex-shrink-0" />
+                          <Label className="text-sm font-medium text-orange-800 truncate">Status</Label>
+                        </div>
+                        <div className="mt-1">
+                          {getStatusBadge(selectedApplication.approval_status)}
+                        </div>
+                      </div>
+                      
+                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-lg border border-blue-200 w-full">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Calendar className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                          <Label className="text-sm font-medium text-blue-800 truncate">Applied Date</Label>
+                        </div>
+                        <p className="text-sm font-semibold text-blue-900 mt-1 break-words">
+                          {new Date(selectedApplication.created_at).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                      
+                      {selectedApplication.approved_at && (
+                        <div className="bg-gradient-to-br from-green-50 to-green-100 p-3 rounded-lg border border-green-200 w-full">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
+                            <Label className="text-sm font-medium text-green-800 truncate">Approved Date</Label>
+                          </div>
+                          <p className="text-sm font-semibold text-green-900 mt-1 break-words">
+                            {new Date(selectedApplication.approved_at).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {selectedApplication.approved_by && (
+                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-3 rounded-lg border border-purple-200 w-full">
+                          <div className="flex items-center gap-2 mb-2">
+                            <UserIcon className="h-4 w-4 text-purple-600 flex-shrink-0" />
+                            <Label className="text-sm font-medium text-purple-800 truncate">Approved By</Label>
+                          </div>
+                          <p className="text-sm font-semibold text-purple-900 mt-1 break-words">
+                            {(() => {
+                              const approver = userEmails.find(user => user.id === selectedApplication.approved_by);
+                              return approver ? (approver.full_name || approver.email) : selectedApplication.approved_by;
+                            })()}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+            
+            <DialogFooter className="mt-4 pt-4 border-t">
+              <Button variant="outline" onClick={() => setViewModalOpen(false)} className="px-6">
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
 };
-
 export default AdminDashboard;
