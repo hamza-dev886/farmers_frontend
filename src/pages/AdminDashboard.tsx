@@ -628,7 +628,6 @@ const AdminDashboard = () => {
 
       await fetchApplications();
       await fetchFarmerPlans(); // Refresh farmer plans to show newly assigned plans
-      setSelectedApplication(null);
       setActionType(null);
     } catch (error) {
       console.error(`Error ${action}ing application:`, error);
@@ -1496,12 +1495,30 @@ const AdminDashboard = () => {
                       </div>
                       
                       {selectedApplication.approved_at && (
-                        <div className="bg-gradient-to-br from-green-50 to-green-100 p-3 rounded-lg border border-green-200 w-full">
+                        <div className={`bg-gradient-to-br p-3 rounded-lg border w-full ${
+                          selectedApplication.approval_status === 'rejected' 
+                            ? 'from-red-50 to-red-100 border-red-200' 
+                            : 'from-green-50 to-green-100 border-green-200'
+                        }`}>
                           <div className="flex items-center gap-2 mb-2">
-                            <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
-                            <Label className="text-sm font-medium text-green-800 truncate">Approved Date</Label>
+                            {selectedApplication.approval_status === 'rejected' ? (
+                              <X className="h-4 w-4 text-red-600 flex-shrink-0" />
+                            ) : (
+                              <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
+                            )}
+                            <Label className={`text-sm font-medium truncate ${
+                              selectedApplication.approval_status === 'rejected' 
+                                ? 'text-red-800' 
+                                : 'text-green-800'
+                            }`}>
+                              {selectedApplication.approval_status === 'rejected' ? 'Rejected Date' : 'Approved Date'}
+                            </Label>
                           </div>
-                          <p className="text-sm font-semibold text-green-900 mt-1 break-words">
+                          <p className={`text-sm font-semibold mt-1 break-words ${
+                            selectedApplication.approval_status === 'rejected' 
+                              ? 'text-red-900' 
+                              : 'text-green-900'
+                          }`}>
                             {new Date(selectedApplication.approved_at).toLocaleDateString('en-US', {
                               year: 'numeric',
                               month: 'long',
@@ -1512,12 +1529,30 @@ const AdminDashboard = () => {
                       )}
                       
                       {selectedApplication.approved_by && (
-                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-3 rounded-lg border border-purple-200 w-full">
+                        <div className={`bg-gradient-to-br p-3 rounded-lg border w-full ${
+                          selectedApplication.approval_status === 'rejected' 
+                            ? 'from-red-50 to-red-100 border-red-200' 
+                            : 'from-purple-50 to-purple-100 border-purple-200'
+                        }`}>
                           <div className="flex items-center gap-2 mb-2">
-                            <UserIcon className="h-4 w-4 text-purple-600 flex-shrink-0" />
-                            <Label className="text-sm font-medium text-purple-800 truncate">Approved By</Label>
+                            <UserIcon className={`h-4 w-4 flex-shrink-0 ${
+                              selectedApplication.approval_status === 'rejected' 
+                                ? 'text-red-600' 
+                                : 'text-purple-600'
+                            }`} />
+                            <Label className={`text-sm font-medium truncate ${
+                              selectedApplication.approval_status === 'rejected' 
+                                ? 'text-red-800' 
+                                : 'text-purple-800'
+                            }`}>
+                              {selectedApplication.approval_status === 'rejected' ? 'Rejected By' : 'Approved By'}
+                            </Label>
                           </div>
-                          <p className="text-sm font-semibold text-purple-900 mt-1 break-words">
+                          <p className={`text-sm font-semibold mt-1 break-words ${
+                            selectedApplication.approval_status === 'rejected' 
+                              ? 'text-red-900' 
+                              : 'text-purple-900'
+                          }`}>
                             {(() => {
                               const approver = userEmails.find(user => user.id === selectedApplication.approved_by);
                               return approver ? (approver.full_name || approver.email) : selectedApplication.approved_by;
