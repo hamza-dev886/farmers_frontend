@@ -21,14 +21,14 @@ interface Farm {
   location?: any; // JSON field from Supabase
 }
 
-export const MapView = () => {
+export const MapView = ({farms, locationCordinates}:any) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [showTokenInput, setShowTokenInput] = useState(true);
   const [mapError, setMapError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(false);
-
+  const [isLoading, setIsLoading] = useState(false);
   // Fetch Mapbox token from config table
   const { data: configData } = useQuery({
     queryKey: ['config', 'mapbox_token'],
@@ -52,19 +52,6 @@ export const MapView = () => {
     }
   }, [configData]);
 
-  // Fetch farms from Supabase
-  const { data: farms = [], isLoading } = useQuery({
-    queryKey: ['farms'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('farms')
-        .select('*');
-      
-      if (error) throw error;
-      return data as Farm[];
-    }
-  });
-
   const initializeMap = (token: string) => {
     if (!mapContainer.current || map.current) return;
 
@@ -82,7 +69,7 @@ export const MapView = () => {
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
         style: 'mapbox://styles/mapbox/streets-v12',
-        center: [-98.5795, 39.8283], // Center of US
+        center: locationCordinates ? [locationCordinates.lng,locationCordinates.lat] : [-98.5795, 39.8283],
         zoom: 4,
         antialias: true,
         preserveDrawingBuffer: false,
@@ -121,14 +108,14 @@ export const MapView = () => {
 
     farms.forEach((farm) => {
       // Use location from database or fallback to random coordinates
-      const lat = farm.location?.lat || (39.8283 + (Math.random() - 0.5) * 20);
-      const lng = farm.location?.lng || (-98.5795 + (Math.random() - 0.5) * 40);
+      const lat = farm.latitude;
+      const lng = farm.longitude;
 
       // Create custom marker element
       const markerElement = document.createElement('div');
       markerElement.className = 'farm-marker';
       markerElement.innerHTML = `
-        <div class="w-10 h-10 bg-farm-green rounded-full flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 transition-transform border-2 border-white">
+        <div class="w-10 h-10 ${farm.type === "farm" ? "bg-farm-green" : "bg-yellow-400"} rounded-full flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 transition-transform border-2 border-white">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
             <path d="M12 2L3 7l9 5 9-5-9-5z"/>
             <path d="M3 17l9 5 9-5"/>
