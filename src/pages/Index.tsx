@@ -19,6 +19,7 @@ type FetchFarmsFuncType = {
     latitude: number;
     longitude: number;
     query?: string;
+    distance?: number;
 };
 
 const Index = () => {
@@ -85,6 +86,7 @@ const Index = () => {
         latitude,
         longitude,
         query,
+        distance = 100,
     }: FetchFarmsFuncType) {
         try {
             setIsLoading(true);
@@ -93,7 +95,7 @@ const Index = () => {
                 userLat: latitude,
                 userLon: longitude,
                 filters: {
-                    withinDistance: 100,
+                    withinDistance: distance,
                     farmTypes: ["farm", "stall"],
                     includeStalls: true,
                     searchQuery: query,
@@ -118,7 +120,7 @@ const Index = () => {
         }
     }
 
-    const handleSearch = async () => {
+    const handleSearch = async (distance = 100) => {
         try {
             // I have used URLSearchParams because useSearchParams from react-router-dom was not updating the query parameters in real time
             const params = new URLSearchParams(window.location.search);
@@ -133,6 +135,7 @@ const Index = () => {
                 latitude: latitude,
                 longitude: longitude,
                 query: searchQuery,
+                distance: distance,
             });
             setFarms(farms);
         } catch (error) {

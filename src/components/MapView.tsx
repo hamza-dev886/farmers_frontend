@@ -14,7 +14,7 @@ import { debounce } from '@/lib/utils';
 type MapViewType = {
   farms: FarmMapDBRecord[];
   locationCordinates: LocationCordinates;
-  handleSearch: () => void;
+  handleSearch: (distance: number) => void;
   isLoading: boolean;
 }
 
@@ -149,6 +149,18 @@ export const MapView = ({ farms, locationCordinates, handleSearch, isLoading }: 
     }
   };
 
+  function calculateRadiusFromBounds(map: mapboxgl.Map): number {
+    const bounds = map.getBounds();
+    const center = map.getCenter();
+    const ne = bounds.getNorthEast();
+    
+    const radiusMeters = center.distanceTo(ne);
+    // Convert to miles (1 meter = 0.000621371 miles)
+    const radiusMiles = radiusMeters * 0.000621371;
+    // Added 50% buffer
+    return radiusMiles * 5;
+  }
+
   const handleMapCenterChange = (latitude: string, longitude: string) => {
     const currentParams = Object.fromEntries(searchParams.entries());
     setSearchParams({
@@ -156,10 +168,10 @@ export const MapView = ({ farms, locationCordinates, handleSearch, isLoading }: 
       lat: latitude,
       lng: longitude
     });
-    debouncedSearch();
+    debouncedSearch(calculateRadiusFromBounds(map.current));
   }
 
-  const debouncedSearch = debounce(handleSearch, 1000);
+  const debouncedSearch = debounce(handleSearch, 1500);
 
   const addFarmMarkers = () => {
     if (!map.current || !farms.length) return;
