@@ -243,16 +243,10 @@ const Index = () => {
                         contact_person={farm.contact_person}
                         email={farm.email}
                         phone={farm.phone}
+                        logo={farm.logo}
+                        type={farm.type}
                       />
                     ))}
-  
-                    {/* Mock Properties (Farm stalls) */}
-                    {/* {mockProperties.map((property) => (
-                    <PropertyCard
-                      key={property.id}
-                      {...property}
-                    />
-                  ))} */}
                   </div>
                 )
             }
