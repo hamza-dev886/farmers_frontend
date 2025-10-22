@@ -1,8 +1,9 @@
--- Drop the materialized view if it exists
+-- Drop the existing materialized view if it exists
 DROP MATERIALIZED VIEW IF EXISTS farm_locations_view CASCADE;
 
--- Create the materialized view
+-- Create the new materialized view
 CREATE MATERIALIZED VIEW farm_locations_view AS
+-- First, get all farms with type 'stall' (standalone records)
 SELECT 
     f.id,
     f.farmer_id,
@@ -16,42 +17,85 @@ SELECT
     f.created_at,
     f.updated_at,
     f.type,
-    -- Use conditional logic for coordinates
-    CASE 
-        WHEN f.type = 'farm' THEN f.latitude
-        WHEN f.type = 'stall' AND fs.latitude IS NOT NULL THEN fs.latitude
-        ELSE f.latitude
-    END AS effective_latitude,
-    CASE 
-        WHEN f.type = 'farm' THEN f.longitude
-        WHEN f.type = 'stall' AND fs.longitude IS NOT NULL THEN fs.longitude
-        ELSE f.longitude
-    END AS effective_longitude,
-    -- Include farm_stall data
+    f.latitude,
+    f.longitude,
+    ST_MakePoint(f.longitude, f.latitude)::geography AS location_point,
+    NULL::UUID AS stall_id,
+    NULL::TEXT AS stall_name,
+    NULL::TEXT AS stall_location,
+    'stall-only' AS record_type -- Indicates this is a farm record
+FROM 
+    farms f
+WHERE 
+    f.type = 'stall'
+
+UNION ALL
+
+-- Second, get all farms with type 'farm' (parent records)
+SELECT 
+    f.id,
+    f.farmer_id,
+    f.name,
+    f.contact_person,
+    f.email,
+    f.phone,
+    f.address,
+    f.location,
+    f.bio,
+    f.created_at,
+    f.updated_at,
+    f.type,
+    f.latitude,
+    f.longitude,
+    ST_MakePoint(f.longitude, f.latitude)::geography AS location_point,
+    NULL::UUID AS stall_id,
+    NULL::TEXT AS stall_name,
+    NULL::TEXT AS stall_location,
+    'farm' AS record_type
+FROM 
+    farms f
+WHERE 
+    f.type = 'farm'
+
+UNION ALL
+
+-- Third, get all farm_stalls for farms with type 'farm'
+SELECT 
+    f.id AS id, -- Keep farm id for grouping
+    f.farmer_id,
+    f.name AS name, -- Farm name
+    f.contact_person,
+    f.email,
+    f.phone,
+    f.address,
+    f.location,
+    f.bio,
+    f.created_at,
+    f.updated_at,
+    f.type,
+    fs.latitude,
+    fs.longitude,
+    ST_MakePoint(fs.longitude, fs.latitude)::geography AS location_point,
     fs.id AS stall_id,
     fs.name AS stall_name,
     fs.location AS stall_location,
-    fs.fence_radius_m,
-    fs.inventory_item_ids,
-    fs.operating_hours,
-    fs.stall_images,
-    fs.is_pickup,
-    fs.pickup_from,
-    fs.pickup_to,
-    fs.prep_buffer,
-    fs."capacityPerSlot"
+    'stall' AS record_type -- Indicates this is a stall record
 FROM 
     farms f
-LEFT JOIN 
-    farm_stalls fs ON f.id = fs.farm_id AND f.type = 'stall';
+INNER JOIN 
+    farm_stalls fs ON f.id = fs.farm_id
+WHERE 
+    f.type = 'farm' AND fs.latitude IS NOT NULL AND fs.longitude IS NOT NULL;
+
+CREATE UNIQUE INDEX idx_farm_locations_unique ON farm_locations_view (id, stall_id, record_type);
 
 -- Create indexes for better performance
 CREATE INDEX idx_farm_locations_type ON farm_locations_view (type);
-CREATE INDEX idx_farm_locations_coords ON farm_locations_view (effective_latitude, effective_longitude);
-CREATE INDEX idx_farm_locations_farmer_id ON farm_locations_view (farmer_id);
+CREATE INDEX idx_farm_locations_record_type ON farm_locations_view (record_type);
+CREATE INDEX idx_farm_locations_geo ON farm_locations_view USING GIST (location_point);
+CREATE INDEX idx_farm_locations_coords ON farm_locations_view (latitude, longitude);
 
 -- Create a unique index for concurrent refresh
-CREATE UNIQUE INDEX idx_farm_locations_id ON farm_locations_view (id, COALESCE(stall_id, '00000000-0000-0000-0000-000000000000'::uuid));
 
 -- Function to refresh the materialized view
 CREATE OR REPLACE FUNCTION refresh_farm_locations_view()
@@ -71,13 +115,13 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger for farms table
-CREATE TRIGGER refresh_farm_locations_on_farms_change
+CREATE OR REPLACE TRIGGER refresh_farm_locations_on_farms_change
 AFTER INSERT OR UPDATE OR DELETE ON farms
 FOR EACH STATEMENT
 EXECUTE FUNCTION trigger_refresh_farm_locations_view();
 
 -- Trigger for farm_stalls table
-CREATE TRIGGER refresh_farm_locations_on_stalls_change
+CREATE OR REPLACE TRIGGER refresh_farm_locations_on_stalls_change
 AFTER INSERT OR UPDATE OR DELETE ON farm_stalls
 FOR EACH STATEMENT
 EXECUTE FUNCTION trigger_refresh_farm_locations_view();

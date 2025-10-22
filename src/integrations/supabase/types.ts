@@ -1,3 +1,5 @@
+import { FarmMapDBRecord } from "@/types/farm"
+
 export type Json =
   | string
   | number
@@ -6441,6 +6443,16 @@ export type Database = {
       user_owns_product_via_variant: {
         Args: { variant_product_id: string }
         Returns: boolean
+      }
+      search_farms_by_distance: {
+        Args: {
+          user_lat: number,
+          user_lon: number,
+          max_distance_meters?: number,
+          farm_types?: string[],
+          include_stalls?: boolean;
+        }
+        Returns: FarmMapDBRecord[]
       }
     }
     Enums: {

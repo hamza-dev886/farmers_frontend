@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { LocationCordinates } from '@/types/user';
+import { FarmMapDBRecord } from '@/types/farm';
 
 interface Farm {
   id: string;
@@ -21,7 +23,13 @@ interface Farm {
   location?: any; // JSON field from Supabase
 }
 
-export const MapView = ({farms, locationCordinates}:any) => {
+type MapViewType = {
+  farms: FarmMapDBRecord[];
+  locationCordinates: LocationCordinates;
+}
+
+export const MapView = ({ farms, locationCordinates }: MapViewType ) => {
+
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string>('');
@@ -69,12 +77,19 @@ export const MapView = ({farms, locationCordinates}:any) => {
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
         style: 'mapbox://styles/mapbox/streets-v12',
-        center: locationCordinates ? [locationCordinates.lng,locationCordinates.lat] : [-98.5795, 39.8283],
-        zoom: 4,
+        center: locationCordinates ? [locationCordinates.lng,locationCordinates.lat] : [40.7128, 74.0060], //Default is New York
+        zoom: 10,
         antialias: true,
         preserveDrawingBuffer: false,
         failIfMajorPerformanceCaveat: false,
+        attributionControl: false,
       });
+
+      // map.current._controls.forEach(control => {
+      //   if (control instanceof mapboxgl.AttributionControl) {
+      //     map.current.removeControl(control);
+      //   }
+      // });
 
       // Add navigation controls
       map.current.addControl(
