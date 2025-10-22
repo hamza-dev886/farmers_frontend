@@ -19,6 +19,7 @@ SELECT
     f.type,
     f.latitude,
     f.longitude,
+    f.logo,
     ST_MakePoint(f.longitude, f.latitude)::geography AS location_point,
     NULL::UUID AS stall_id,
     NULL::TEXT AS stall_name,
@@ -47,6 +48,7 @@ SELECT
     f.type,
     f.latitude,
     f.longitude,
+    f.logo,
     ST_MakePoint(f.longitude, f.latitude)::geography AS location_point,
     NULL::UUID AS stall_id,
     NULL::TEXT AS stall_name,
@@ -75,6 +77,7 @@ SELECT
     f.type,
     fs.latitude,
     fs.longitude,
+    f.logo,
     ST_MakePoint(fs.longitude, fs.latitude)::geography AS location_point,
     fs.id AS stall_id,
     fs.name AS stall_name,
@@ -94,6 +97,8 @@ CREATE INDEX idx_farm_locations_type ON farm_locations_view (type);
 CREATE INDEX idx_farm_locations_record_type ON farm_locations_view (record_type);
 CREATE INDEX idx_farm_locations_geo ON farm_locations_view USING GIST (location_point);
 CREATE INDEX idx_farm_locations_coords ON farm_locations_view (latitude, longitude);
+
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY farm_locations_view;
 
 -- Create a unique index for concurrent refresh
 

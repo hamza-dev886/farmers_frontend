@@ -1,42 +1,33 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MapPin, Leaf, Store, Star } from "lucide-react";
+import { MapPin, Leaf } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { LocationCordinates } from '@/types/user';
 import { FarmMapDBRecord } from '@/types/farm';
-
-interface Farm {
-  id: string;
-  name: string;
-  address: string;
-  bio?: string;
-  contact_person: string;
-  email: string;
-  phone?: string;
-  location?: any; // JSON field from Supabase
-}
+import { useSearchParams } from "react-router-dom";
 
 type MapViewType = {
   farms: FarmMapDBRecord[];
   locationCordinates: LocationCordinates;
 }
 
+const ZOOM = 10;
+
 export const MapView = ({ farms, locationCordinates }: MapViewType ) => {
 
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string>('');
-  const [showTokenInput, setShowTokenInput] = useState(true);
-  const [mapError, setMapError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const [searchParams] = useSearchParams();
+
+
   // Fetch Mapbox token from config table
   const { data: configData } = useQuery({
     queryKey: ['config', 'mapbox_token'],
@@ -52,19 +43,51 @@ export const MapView = ({ farms, locationCordinates }: MapViewType ) => {
     }
   });
 
+  useEffect(() => {
+    if (mapboxToken && !map.current && mapContainer.current) {
+      console.log('Initializing map with token:', mapboxToken.substring(0, 10) + '...');
+      initializeMap(mapboxToken);
+    }
+  }, [mapboxToken]);
+
+  // Ensure cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (map.current && farms.length > 0) {
+      addFarmMarkers();
+    }
+  }, [farms]);
+
   // Update token when config data loads
   useEffect(() => {
     if (configData?.value) {
       setMapboxToken(configData.value);
-      setShowTokenInput(false);
     }
   }, [configData]);
+
+  useEffect(() => {
+    const searchLat = searchParams.get('lat');
+    const searchLng = searchParams.get('lng');
+
+    if (searchLat && searchLng && map.current) {
+      map.current.jumpTo({
+        center: [parseFloat(searchLng), parseFloat(searchLat)]
+      })
+    }
+  }, [searchParams, map.current])
 
   const initializeMap = (token: string) => {
     if (!mapContainer.current || map.current) return;
 
     setIsInitializing(true);
-    setMapError('');
 
     try {
       mapboxgl.accessToken = token;
@@ -78,18 +101,12 @@ export const MapView = ({ farms, locationCordinates }: MapViewType ) => {
         container: mapContainer.current,
         style: 'mapbox://styles/mapbox/streets-v12',
         center: locationCordinates ? [locationCordinates.lng,locationCordinates.lat] : [40.7128, 74.0060], //Default is New York
-        zoom: 10,
+        zoom: ZOOM,
         antialias: true,
         preserveDrawingBuffer: false,
         failIfMajorPerformanceCaveat: false,
         attributionControl: false,
       });
-
-      // map.current._controls.forEach(control => {
-      //   if (control instanceof mapboxgl.AttributionControl) {
-      //     map.current.removeControl(control);
-      //   }
-      // });
 
       // Add navigation controls
       map.current.addControl(
@@ -107,13 +124,11 @@ export const MapView = ({ farms, locationCordinates }: MapViewType ) => {
 
       map.current.on('error', (e) => {
         console.error('Mapbox error:', e);
-        setMapError('Failed to load the map. Please check your token and try again.');
         setIsInitializing(false);
       });
 
     } catch (error) {
       console.error('Map initialization error:', error);
-      setMapError(error instanceof Error ? error.message : 'Failed to initialize map');
       setIsInitializing(false);
     }
   };
@@ -178,38 +193,6 @@ export const MapView = ({ farms, locationCordinates }: MapViewType ) => {
     });
   };
 
-  useEffect(() => {
-    if (mapboxToken && !map.current && mapContainer.current) {
-      console.log('Initializing map with token:', mapboxToken.substring(0, 10) + '...');
-      initializeMap(mapboxToken);
-    }
-  }, [mapboxToken]);
-
-  // Ensure cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (map.current && farms.length > 0) {
-      addFarmMarkers();
-    }
-  }, [farms]);
-
-  const handleTokenSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (mapboxToken.trim()) {
-      setShowTokenInput(false);
-      setMapError('');
-      initializeMap(mapboxToken);
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="relative w-full h-[600px] bg-gradient-subtle rounded-lg border border-border overflow-hidden flex items-center justify-center">
@@ -223,60 +206,12 @@ export const MapView = ({ farms, locationCordinates }: MapViewType ) => {
 
   return (
     <div className="relative w-full h-[600px] bg-gradient-subtle rounded-lg border border-border overflow-hidden">
-      {/* Debug info */}
-      <div className="absolute top-2 right-2 z-50 bg-background/90 p-2 rounded text-xs">
-        Token: {mapboxToken ? 'Set' : 'Not set'} | 
-        Show Input: {showTokenInput.toString()} | 
-        Error: {mapError ? 'Yes' : 'No'} | 
-        Initializing: {isInitializing.toString()}
-      </div>
-      {mapError && (
-        <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4">
-            <CardHeader>
-              <CardTitle className="text-center text-destructive">Map Error</CardTitle>
-            </CardHeader>
-            <CardContent className="text-center space-y-4">
-              <p className="text-sm text-muted-foreground">{mapError}</p>
-              <Button onClick={() => {
-                setMapError('');
-                setShowTokenInput(true);
-                if (map.current) {
-                  map.current.remove();
-                  map.current = null;
-                }
-              }}>
-                Try Again
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
       {isInitializing && (
         <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-40">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farm-green mx-auto mb-4"></div>
             <p className="text-muted-foreground">Initializing map...</p>
           </div>
-        </div>
-      )}
-
-      {showTokenInput && !configData?.value && (
-        <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4">
-            <CardHeader>
-              <CardTitle className="text-center">Mapbox Configuration</CardTitle>
-            </CardHeader>
-            <CardContent className="text-center space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Mapbox token is configured in the system configuration.
-              </p>
-              <Button onClick={() => setShowTokenInput(false)}>
-                Close
-              </Button>
-            </CardContent>
-          </Card>
         </div>
       )}
 
@@ -293,7 +228,7 @@ export const MapView = ({ farms, locationCordinates }: MapViewType ) => {
               navigator.geolocation.getCurrentPosition((position) => {
                 map.current?.flyTo({
                   center: [position.coords.longitude, position.coords.latitude],
-                  zoom: 12
+                  zoom: ZOOM
                 });
               });
             }
@@ -321,18 +256,6 @@ export const MapView = ({ farms, locationCordinates }: MapViewType ) => {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Settings button */}
-      <div className="absolute bottom-4 right-4 z-10">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="bg-background/90 backdrop-blur-sm hover:bg-background"
-          onClick={() => setShowTokenInput(true)}
-        >
-          Settings
-        </Button>
       </div>
     </div>
   );
