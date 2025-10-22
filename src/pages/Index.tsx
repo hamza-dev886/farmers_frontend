@@ -16,7 +16,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useStore } from "@/store/store";
-import { searchFarmsWithPostGIS } from "@/services/getFarmfromDB";
+import { searchFarmsWithFilters } from "@/services/getFarmfromDB";
 
 interface Farm {
   id: string;
@@ -34,6 +34,7 @@ interface Farm {
 const Index = () => {
   const { viewMode, setViewMode } = useViewMode();
   const [showFilters, setShowFilters] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [farms, setFarms] = useState<any[]>([]);
@@ -80,20 +81,41 @@ const Index = () => {
     checkUserRole();
   }, [navigate]);
 
+  useEffect(() => {
+    const loadFarms = async () => {
+      const farms = await fetchFarms();
+      setFarms(farms as any);
+    };
+    loadFarms();
+  }, [locationCordinates, lat, lng]);
+
   async function fetchFarms() {
-    const farms = await searchFarmsWithPostGIS({
-      userLat: lat || locationCordinates.lat,
-      userLon: lng || locationCordinates.lng,
-      filters: {
-        withinDistance: 50,
-        farmTypes: '{farm,stall}',
-        include_stalls: true
-      }
-    });
-    console.log("Farms fetched from PostGIS:", farms.data);
-    const grouped = groupResultsByFarm(farms.data);
-    console.log("Final grouped farms:", grouped);
-    return grouped;
+    try {
+      setIsLoading(true);
+
+      const { data: farms, error } = await searchFarmsWithFilters({
+        userLat: parseFloat(lat) || locationCordinates.lat,
+        userLon: parseFloat(lng) || locationCordinates.lng,
+        filters: {
+          withinDistance: 100,
+          farmTypes: ["farm", "stall"],
+          includeStalls: true
+        }
+      });
+
+      if (error) throw new Error(error as unknown as string);
+
+      console.log("Farms fetched from searchFarmsWithFilters:", farms);
+
+      // const grouped = groupResultsByFarm(farms);
+      // console.log("Final grouped farms:", grouped);
+      
+      return farms;
+    } catch (error) {
+      console.error("Error fetching the farms : ", error);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   function groupResultsByFarm(results) {
@@ -140,6 +162,10 @@ const Index = () => {
     const new_arr = [];
 
     const array = Object.values(grouped).filter((g : any) => g.farm !== null);
+
+    for (const item of results) {
+      
+    }
     
     array.forEach((result:any) => {
         const farm = result.farm;
@@ -213,14 +239,6 @@ const Index = () => {
     return new_arr;
 }
 
-  useEffect(() => {
-    const loadFarms = async () => {
-      const farms = await fetchFarms();
-      setFarms(farms as any);
-    };
-    loadFarms();
-  }, [locationCordinates, lat, lng]);
-
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -250,9 +268,9 @@ const Index = () => {
             <div className="bg-card rounded-lg border p-4 mb-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  {/* <h2 className="text-2xl font-bold text-foreground">
-                    {isLoading ? 'Loading...' : `${farms.length + mockProperties.length} Farm Listings`}
-                  </h2> */}
+                  <h2 className="text-2xl font-bold text-foreground">
+                    {isLoading ? 'Loading...' : `${farms.length} Farm Listings`}
+                  </h2>
                   <p className="text-muted-foreground">
                     {farms.length} Farms in your area
                   </p>
@@ -317,48 +335,47 @@ const Index = () => {
               </div>
             </div>
 
-            {/* Content based on view mode */}
-            {viewMode === "map" ? (
-              <div className="relative">
-                <MapView farms={farms} locationCordinates={locationCordinates} />
-              </div>) :
-              // ) : isLoading ? (
-              //   <div className="flex items-center justify-center py-16">
-              //     <div className="text-center">
-              //       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farm-green mx-auto mb-4"></div>
-              //       <p className="text-muted-foreground">Loading farms...</p>
-              //     </div>
-              //   </div>
-              // ) : (
-              (
-                <div className={
-                  viewMode === "grid"
-                    ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
-                    : "space-y-4"
-                }>
-                  {/* Real Farms from Supabase */}
-                  {farms.length !== 0 && farms.map((farm) => (
-                    <FarmCard
-                      key={farm.id}
-                      id={farm.id}
-                      name={farm.name}
-                      address={farm.address}
-                      bio={farm.bio}
-                      contact_person={farm.contact_person}
-                      email={farm.email}
-                      phone={farm.phone}
-                    />
-                  ))}
-
-                  {/* Mock Properties (Farm stalls) */}
-                  {/* {mockProperties.map((property) => (
-                  <PropertyCard
-                    key={property.id}
-                    {...property}
-                  />
-                ))} */}
+            {isLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farm-green mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading farms...</p>
+                  </div>
                 </div>
-              )}
+              ) : viewMode === "map" ? (
+                <div className="relative">
+                  <MapView farms={farms} locationCordinates={locationCordinates} />
+                </div>) :
+                (
+                  <div className={
+                    viewMode === "grid"
+                      ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+                      : "space-y-4"
+                  }>
+                    {/* Real Farms from Supabase */}
+                    {farms.length !== 0 && farms.map((farm) => (
+                      <FarmCard
+                        key={farm.id}
+                        id={farm.id}
+                        name={farm.name}
+                        address={farm.address}
+                        bio={farm.bio}
+                        contact_person={farm.contact_person}
+                        email={farm.email}
+                        phone={farm.phone}
+                      />
+                    ))}
+  
+                    {/* Mock Properties (Farm stalls) */}
+                    {/* {mockProperties.map((property) => (
+                    <PropertyCard
+                      key={property.id}
+                      {...property}
+                    />
+                  ))} */}
+                  </div>
+                )
+            }
           </div>
         </div>
       </main>
