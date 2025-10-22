@@ -13,11 +13,12 @@ import { useSearchParams } from "react-router-dom";
 type MapViewType = {
   farms: FarmMapDBRecord[];
   locationCordinates: LocationCordinates;
+  handleSearch: () => void;
 }
 
 const ZOOM = 10;
 
-export const MapView = ({ farms, locationCordinates }: MapViewType ) => {
+export const MapView = ({ farms, locationCordinates, handleSearch }: MapViewType ) => {
 
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -25,8 +26,8 @@ export const MapView = ({ farms, locationCordinates }: MapViewType ) => {
   const [isInitializing, setIsInitializing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [searchParams] = useSearchParams();
-
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isUpdatingFromParams = useRef(false);
 
   // Fetch Mapbox token from config table
   const { data: configData } = useQuery({
@@ -77,12 +78,17 @@ export const MapView = ({ farms, locationCordinates }: MapViewType ) => {
     const searchLat = searchParams.get('lat');
     const searchLng = searchParams.get('lng');
 
-    if (searchLat && searchLng && map.current) {
+    if (searchLat && searchLng && map.current && !isUpdatingFromParams.current) {
+      isUpdatingFromParams.current = true;
       map.current.jumpTo({
         center: [parseFloat(searchLng), parseFloat(searchLat)]
-      })
+      });
+      // Reset flag after a short delay to allow map to settle
+      setTimeout(() => {
+        isUpdatingFromParams.current = false;
+      }, 100);
     }
-  }, [searchParams, map.current])
+  }, [searchParams, map.current]);
 
   const initializeMap = (token: string) => {
     if (!mapContainer.current || map.current) return;
@@ -127,11 +133,29 @@ export const MapView = ({ farms, locationCordinates }: MapViewType ) => {
         setIsInitializing(false);
       });
 
+      map.current.on('moveend', () => {
+        // Only update params if the move wasn't triggered by search params change
+        if (!isUpdatingFromParams.current && map.current) {
+          const { lng, lat } = map.current.getCenter();
+          handleMapCenterChange(lat.toString(), lng.toString());
+        }
+      });
+
     } catch (error) {
       console.error('Map initialization error:', error);
       setIsInitializing(false);
     }
   };
+
+  const handleMapCenterChange = (latitude: string, longitude: string) => {
+    const query = searchParams.get('q');
+    setSearchParams({
+      ...(query && { q: query }),
+      lat: latitude,
+      lng: longitude
+    });
+    handleSearch();
+  }
 
   const addFarmMarkers = () => {
     if (!map.current || !farms.length) return;

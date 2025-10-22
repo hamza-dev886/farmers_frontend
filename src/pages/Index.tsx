@@ -113,7 +113,8 @@ const Index = () => {
       const searchLat = params.get('lat');
       const searchLng = params.get('lng');
 
-      await fetchFarms(parseFloat(searchLat), parseFloat(searchLng));
+      const farms = await fetchFarms(parseFloat(searchLat), parseFloat(searchLng));
+      setFarms(farms);
     } catch (error) {
       console.error("Error while handling search : ", error);
     }
@@ -224,7 +225,11 @@ const Index = () => {
                 </div>
               ) : viewMode === "map" ? (
                 <div className="relative">
-                  <MapView farms={farms} locationCordinates={locationCordinates} />
+                  <MapView 
+                    farms={farms} 
+                    locationCordinates={locationCordinates} 
+                    handleSearch={handleSearch}
+                  />
                 </div>) :
                 (
                   <div className={
