@@ -112,6 +112,7 @@ export const MapView = ({ farms, locationCordinates, handleSearch }: MapViewType
         preserveDrawingBuffer: false,
         failIfMajorPerformanceCaveat: false,
         attributionControl: false,
+        minZoom: ZOOM
       });
 
       // Add navigation controls
@@ -148,9 +149,9 @@ export const MapView = ({ farms, locationCordinates, handleSearch }: MapViewType
   };
 
   const handleMapCenterChange = (latitude: string, longitude: string) => {
-    const query = searchParams.get('q');
+    const currentParams = Object.fromEntries(searchParams.entries());
     setSearchParams({
-      ...(query && { q: query }),
+      ...currentParams,
       lat: latitude,
       lng: longitude
     });
@@ -252,7 +253,6 @@ export const MapView = ({ farms, locationCordinates, handleSearch }: MapViewType
               navigator.geolocation.getCurrentPosition((position) => {
                 map.current?.flyTo({
                   center: [position.coords.longitude, position.coords.latitude],
-                  zoom: ZOOM
                 });
               });
             }

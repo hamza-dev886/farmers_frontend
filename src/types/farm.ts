@@ -28,3 +28,14 @@ export type FarmMapDBRecord = {
     bio: string | null;
     logo: string | null;
 };
+
+export type SearchFarmsWithFiltersType = {
+    userLat: number;
+    userLon: number;
+    filters: null | {
+        withinDistance?: number;
+        farmTypes?: string[];
+        includeStalls?: boolean;
+        searchQuery?: string;
+    }
+}
