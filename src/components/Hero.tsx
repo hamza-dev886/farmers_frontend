@@ -121,7 +121,7 @@ export const Hero = ({
   };
 
   return (
-    <section className="relative min-h-[70vh] flex items-center justify-center overflow-hidden">
+    <section className="relative min-h-[70vh] flex items-center justify-center overflow-visible">
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${heroImage})` }}
@@ -152,7 +152,7 @@ export const Hero = ({
               />
 
               {showSuggestions && suggestions.length > 0 && (
-                <div className="absolute -top-[30vh] left-0 right-0 mt-2 bg-card backdrop-blur-sm rounded-lg shadow-lg border border-border z-[10] overflow-y-auto max-h-56">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-card backdrop-blur-sm rounded-lg shadow-lg border border-border z-[10] overflow-y-auto max-h-56">
                   {suggestions.map((feature) => (
                     <button
                       key={feature.id}
