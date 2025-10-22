@@ -26,4 +26,5 @@ export type FarmMapDBRecord = {
     record_type: FarmRecordTypes;
     distance_meters: number;
     bio: string | null;
+    logo: string | null;
 };
