@@ -161,7 +161,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
             contentType: farmImageFile.type,
           });
         if (uploadError) throw uploadError;
-        imageUrl = supabase.storage.from('farmers_bucket').getPublicUrl(fileName).data.publicUrl;
+        imageUrl = fileName;
       }
 
       // Submit farmer application with the new user's ID
@@ -347,7 +347,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                       )}
                     />
 
-                      <FormField
+                    <FormField
                       control={form.control}
                       name="password"
                       render={({ field }) => (
@@ -365,7 +365,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                       )}
                     />
 
-                      <FormField
+                    <FormField
                       control={form.control}
                       name="confirmPassword"
                       render={({ field }) => (
@@ -448,7 +448,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                                   )}
                                 </div>
                               </div>
-                              {(index+1) === socialLinksCount && index < 2 && (
+                              {(index + 1) === socialLinksCount && index < 2 && (
                                 <Button
                                   type="button"
                                   variant="outline"
