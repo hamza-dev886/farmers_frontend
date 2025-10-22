@@ -14,20 +14,35 @@ type MapViewType = {
   farms: FarmMapDBRecord[];
   locationCordinates: LocationCordinates;
   handleSearch: () => void;
-  isLoading: boolean;
 }
 
-const ZOOM = 10;
+type BoundingBox = {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+  zoom: number;
+};
 
-export const MapView = ({ farms, locationCordinates, handleSearch, isLoading }: MapViewType ) => {
+const ZOOM = 10;
+const BUFFER_PERCENTAGE = 0.5; // 50% buffer on each side
+const ZOOM_CHANGE_THRESHOLD = 2; // Refetch if zoom changes by 2 levels
+
+export const MapView = ({ farms, locationCordinates, handleSearch }: MapViewType ) => {
 
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const isUpdatingFromParams = useRef(false);
+
+  // Track the last fetched bounds with buffer
+  const lastFetchedBounds = useRef<BoundingBox | null>(null);
+  // Track existing markers
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
 
   // Fetch Mapbox token from config table
   const { data: configData } = useQuery({
@@ -57,6 +72,10 @@ export const MapView = ({ farms, locationCordinates, handleSearch, isLoading }: 
       if (map.current) {
         map.current.remove();
         map.current = null;
+
+        // Clean up markers
+        markersRef.current.forEach(marker => marker.remove());
+        markersRef.current = [];
       }
     };
   }, []);
@@ -127,6 +146,15 @@ export const MapView = ({ farms, locationCordinates, handleSearch, isLoading }: 
       map.current.on('load', () => {
         setIsInitializing(false);
         addFarmMarkers();
+
+        // Fetch initial data for the current view
+        // if (map.current) {
+        //   const bounds = map.current.getBounds();
+        //   const zoom = map.current.getZoom();
+        //   const boundsWithBuffer = getBoundsWithBuffer(bounds, zoom);
+        //   // fetchFarmsForBounds(boundsWithBuffer);
+        //   handleSearch()
+        // }
       });
 
       map.current.on('error', (e) => {
@@ -134,17 +162,90 @@ export const MapView = ({ farms, locationCordinates, handleSearch, isLoading }: 
         setIsInitializing(false);
       });
 
-      map.current.on('moveend', () => {
-        // Only update params if the move wasn't triggered by search params change
-        if (!isUpdatingFromParams.current && map.current) {
-          const { lng, lat } = map.current.getCenter();
-          handleMapCenterChange(lat.toString(), lng.toString());
-        }
-      });
+      // Use moveend instead of dragend to catch all movements (drag, zoom, etc.)
+      map.current.on('moveend', handleMapMove);
+
+      // Also listen to zoomend for immediate zoom changes
+      map.current.on('zoomend', handleMapMove);
+
+      // map.current.on('moveend', () => {
+      //   // Only update params if the move wasn't triggered by search params change
+      //   if (!isUpdatingFromParams.current && map.current) {
+      //     const { lng, lat } = map.current.getCenter();
+      //     handleMapCenterChange(lat.toString(), lng.toString());
+      //   }
+      // });
 
     } catch (error) {
       console.error('Map initialization error:', error);
       setIsInitializing(false);
+    }
+  };
+
+  const getBoundsWithBuffer = (bounds: mapboxgl.LngLatBounds, zoom: number): BoundingBox => {
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+    
+    const latDiff = ne.lat - sw.lat;
+    const lngDiff = ne.lng - sw.lng;
+    
+    const latBuffer = latDiff * BUFFER_PERCENTAGE;
+    const lngBuffer = lngDiff * BUFFER_PERCENTAGE;
+    
+    return {
+      north: ne.lat + latBuffer,
+      south: sw.lat - latBuffer,
+      east: ne.lng + lngBuffer,
+      west: sw.lng - lngBuffer,
+      zoom: zoom
+    };
+  };
+
+  const isOutsideBufferedBounds = (currentBounds: mapboxgl.LngLatBounds, currentZoom: number): boolean => {
+    if (!lastFetchedBounds.current) return true;
+    
+    const ne = currentBounds.getNorthEast();
+    const sw = currentBounds.getSouthWest();
+    const lastBounds = lastFetchedBounds.current;
+    
+    // Check if zoom level changed significantly
+    const zoomDiff = Math.abs(currentZoom - lastBounds.zoom);
+    if (zoomDiff >= ZOOM_CHANGE_THRESHOLD) {
+      console.log('Zoom change threshold exceeded:', zoomDiff);
+      return true;
+    }
+    
+    // Check if any corner is outside the buffered bounds
+    const isOutside = 
+      ne.lat > lastBounds.north ||
+      sw.lat < lastBounds.south ||
+      ne.lng > lastBounds.east ||
+      sw.lng < lastBounds.west;
+    
+    if (isOutside) {
+      console.log('View moved outside buffered bounds');
+    }
+    
+    return isOutside;
+  };
+
+  const handleMapMove = () => {
+    if (!map.current || isUpdatingFromParams.current) return;
+    
+    const currentBounds = map.current.getBounds();
+    const currentZoom = map.current.getZoom();
+    const center = map.current.getCenter();
+    
+    // Update URL params
+    handleMapCenterChange(center.lat.toString(), center.lng.toString());
+    console.log(isOutsideBufferedBounds(currentBounds, currentZoom))
+    // Check if we need to fetch new data
+    if (isOutsideBufferedBounds(currentBounds, currentZoom)) {
+      const boundsWithBuffer = getBoundsWithBuffer(currentBounds, currentZoom);
+      // fetchFarmsForBounds(boundsWithBuffer);
+      lastFetchedBounds.current = boundsWithBuffer;
+
+      handleSearch()
     }
   };
 
@@ -155,7 +256,7 @@ export const MapView = ({ farms, locationCordinates, handleSearch, isLoading }: 
       lat: latitude,
       lng: longitude
     });
-    handleSearch();
+    // handleSearch();
   }
 
   const addFarmMarkers = () => {
@@ -192,7 +293,7 @@ export const MapView = ({ farms, locationCordinates, handleSearch, isLoading }: 
             </div>
           </div>
           <p class="text-sm text-muted-foreground mb-2">${farm.address}</p>
-          ${farm.bio ? `<p class="text-sm mb-3">${farm.bio.substring(0, 20)}${farm.bio.length > 10 ? '...' : ''}</p>` : ''}
+          ${farm.bio ? `<p class="text-sm mb-3">${farm.bio.substring(0, 100)}${farm.bio.length > 100 ? '...' : ''}</p>` : ''}
           <div class="flex flex-wrap gap-1 mb-3">
             <span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-farm-green/10 text-farm-green">
               🥕 Fresh Produce
@@ -203,8 +304,8 @@ export const MapView = ({ farms, locationCordinates, handleSearch, isLoading }: 
           </div>
           <div class="flex justify-between items-center">
             <span class="text-sm text-muted-foreground">Contact: ${farm.contact_person}</span>
-            <button class="px-3 py-1 bg-farm-green text-white rounded-md text-sm hover:bg-farm-green/90 transition-colors" onClick="window.open('/farmer/${farm.id}', '_self')">
-              View ${farm.type === "farm" ? "Farm" : "Stall"}
+            <button class="px-3 py-1 bg-farm-green text-white rounded-md text-sm hover:bg-farm-green/90 transition-colors">
+              View Farm
             </button>
           </div>
         </div>
@@ -218,13 +319,24 @@ export const MapView = ({ farms, locationCordinates, handleSearch, isLoading }: 
     });
   };
 
+  if (isLoading) {
+    return (
+      <div className="relative w-full h-[600px] bg-gradient-subtle rounded-lg border border-border overflow-hidden flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farm-green mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading farms...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full h-[600px] bg-gradient-subtle rounded-lg border border-border overflow-hidden">
-      {(isInitializing || isLoading) && (
-        <div className="absolute inset-0 bg-background/5 backdrop-blur-sm flex items-center justify-center z-40">
+      {isInitializing && (
+        <div className="absolute inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center z-40">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farm-green mx-auto mb-4"></div>
-            <p className="text-muted-foreground">{isLoading ? 'Loading farms...' : 'Initializing map...'}</p>
+            <p className="text-muted-foreground">Initializing map...</p>
           </div>
         </div>
       )}
