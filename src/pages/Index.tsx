@@ -216,7 +216,7 @@ const Index = () => {
               </div>
             </div>
 
-            {isLoading ? (
+            {isLoading && (viewMode === "grid" || viewMode === "list") ? (
                 <div className="flex items-center justify-center py-16">
                   <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farm-green mx-auto mb-4"></div>
@@ -229,13 +229,14 @@ const Index = () => {
                     farms={farms} 
                     locationCordinates={locationCordinates} 
                     handleSearch={handleSearch}
+                    isLoading={isLoading}
                   />
                 </div>) :
                 (
                   <div className={
                     viewMode === "grid"
                       ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
-                      : "space-y-4"
+                      : "grid grid-cols-1 space-y-3"
                   }>
                     {/* Real Farms from Supabase */}
                     {farms.length !== 0 && farms.map((farm) => (
