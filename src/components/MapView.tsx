@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LocationCordinates } from '@/types/user';
 import { FarmMapDBRecord } from '@/types/farm';
 import { useSearchParams } from "react-router-dom";
+import { debounce } from '@/lib/utils';
 
 type MapViewType = {
   farms: FarmMapDBRecord[];
@@ -155,8 +156,10 @@ export const MapView = ({ farms, locationCordinates, handleSearch, isLoading }: 
       lat: latitude,
       lng: longitude
     });
-    handleSearch();
+    debouncedSearch();
   }
+
+  const debouncedSearch = debounce(handleSearch, 1000);
 
   const addFarmMarkers = () => {
     if (!map.current || !farms.length) return;
