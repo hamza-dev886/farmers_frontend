@@ -1,14 +1,22 @@
 -- Drop existing function if it exists
 DROP FUNCTION IF EXISTS search_farms_by_distance;
 
+<<<<<<< HEAD
 -- Create the updated function with name search
+=======
+-- Create the updated function
+>>>>>>> 1b67387f2e8c51984e931155f53dd7c1791f709a
 CREATE OR REPLACE FUNCTION search_farms_by_distance(
     user_lat FLOAT,
     user_lon FLOAT,
     max_distance_meters FLOAT DEFAULT NULL,
     farm_types TEXT[] DEFAULT '{}',
+<<<<<<< HEAD
     include_stalls BOOLEAN DEFAULT TRUE,
     search_query TEXT DEFAULT NULL  -- New parameter for name search
+=======
+    include_stalls BOOLEAN DEFAULT TRUE
+>>>>>>> 1b67387f2e8c51984e931155f53dd7c1791f709a
 )
 RETURNS TABLE (
     id UUID,
@@ -26,7 +34,11 @@ RETURNS TABLE (
     stall_location TEXT,
     record_type TEXT,
     bio TEXT,   
+<<<<<<< HEAD
     logo TEXT,
+=======
+    logo TEXT,                 -- Added missing bio column
+>>>>>>> 1b67387f2e8c51984e931155f53dd7c1791f709a
     distance_meters FLOAT
 ) AS $$
 BEGIN
@@ -67,6 +79,7 @@ BEGIN
             )
         )
         -- Optionally exclude stall records
+<<<<<<< HEAD
         AND (include_stalls = TRUE OR flv.record_type != 'stall')
         -- Search by farm name or stall name (case-insensitive)
         AND (
@@ -91,5 +104,12 @@ BEGIN
         distance_meters,
         flv.id,
         flv.record_type DESC;
+=======
+        AND (include_stalls = TRUE OR flv.record_type = 'farm')
+    ORDER BY 
+        flv.id,
+        flv.record_type DESC, -- Farm records first, then stalls
+        distance_meters;
+>>>>>>> 1b67387f2e8c51984e931155f53dd7c1791f709a
 END;
 $$ LANGUAGE plpgsql;
