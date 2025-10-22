@@ -5,9 +5,15 @@ import { Input } from "@/components/ui/input";
 import heroImage from "@/assets/farm-hero.jpg";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useSearchParams } from 'react-router-dom';
 
-export const Hero = () => {
+type HeroType = {
+  handleSearch: () => void;
+}
+
+export const Hero = ({
+  handleSearch
+}: HeroType) => {
   const [locationQuery, setLocationQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -15,7 +21,8 @@ export const Hero = () => {
   const [mapboxToken, setMapboxToken] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const suggestionsRef = useRef(null);
-  const navigate = useNavigate();
+
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { data: configData } = useQuery({
     queryKey: ['config', 'mapbox_token'],
@@ -96,34 +103,20 @@ export const Hero = () => {
     setShowSuggestions(false);
   };
 
-  const handleSearch = () => {
+  const handleInputSearch = () => {
     if (selectedLocation) {
       const [lng, lat] = selectedLocation.coordinates;
 
-      // Build URL with lat, lng, and optional search query
-      const params = new URLSearchParams({
-        lat: lat.toString(),
-        lng: lng.toString(),
-      });
+      setSearchParams({ lng, lat })
 
       if (searchQuery.trim()) {
-        params.append('q', searchQuery.trim());
+        setSearchParams({
+          ...searchParams,
+          q: searchQuery.trim()
+        })
       }
 
-      // Navigate to search results page with coordinates
-      navigate(`?${params.toString()}`);
-
-      console.log("Searching near:", {
-        location: selectedLocation.name,
-        lat,
-        lng,
-        searchQuery
-      });
-    } else {
-      // If no location selected but there's a search query
-      if (searchQuery.trim()) {
-        navigate(`?q=${encodeURIComponent(searchQuery.trim())}`);
-      }
+      handleSearch();
     }
   };
 
@@ -186,14 +179,14 @@ export const Hero = () => {
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                onKeyDown={(e) => e.key === 'Enter' && handleInputSearch()}
                 placeholder="Search farms, produce, or events"
                 className="pl-10 h-12 border-farm-green/20 focus:border-farm-green"
               />
             </div>
 
             <Button
-              onClick={handleSearch}
+              onClick={handleInputSearch}
               className="md:w-auto w-full"
             >
               Find Farms
