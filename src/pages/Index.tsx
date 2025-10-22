@@ -2,49 +2,28 @@ import { Grid, List, Map, Filter } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { FilterSidebar } from "@/components/FilterSidebar";
-import { PropertyCard } from "@/components/PropertyCard";
 import { FarmCard } from "@/components/FarmCard";
 import { MapView } from "@/components/MapView";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-
-import { mockProperties } from "@/data/mockProperties";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
 import { useViewMode } from "@/hooks/useViewMode";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useStore } from "@/store/store";
 import { searchFarmsWithFilters } from "@/services/getFarmfromDB";
-
-interface Farm {
-  id: string;
-  name: string;
-  address: string;
-  bio?: string;
-  contact_person: string;
-  email: string;
-  phone?: string;
-  location?: any;
-  created_at: string;
-  farmer_id: string;
-}
+import { FarmMapDBRecord } from "@/types/farm";
 
 const Index = () => {
-  const { viewMode, setViewMode } = useViewMode();
   const [showFilters, setShowFilters] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [farms, setFarms] = useState<FarmMapDBRecord[]>([]);
+
   const isMobile = useIsMobile();
   const navigate = useNavigate();
-  const [farms, setFarms] = useState<any[]>([]);
   const { locationCordinates } = useStore(state => state);
-  const [searchParams] = useSearchParams();
-
-  const lat = searchParams.get('lat');
-  const lng = searchParams.get('lng');
-  const query = searchParams.get('q');
-
+  const { viewMode, setViewMode } = useViewMode();
   const { setLocationCordinates } = useStore(state => state)
 
   useEffect(() => {
@@ -81,21 +60,33 @@ const Index = () => {
     checkUserRole();
   }, [navigate]);
 
+  // Load farm on initial load with user's current lcoation
   useEffect(() => {
     const loadFarms = async () => {
-      const farms = await fetchFarms();
-      setFarms(farms as any);
+      const farms = await fetchFarms(locationCordinates.lat, locationCordinates.lng);
+      setFarms(farms);
     };
-    loadFarms();
-  }, [locationCordinates, lat, lng]);
 
-  async function fetchFarms() {
+    loadFarms();
+  }, [locationCordinates]);
+
+  async function fetchFarms(latitude: number, longitude: number) {
     try {
       setIsLoading(true);
 
+      console.log("Fetching farms payload", {
+        userLat: latitude,
+        userLon: longitude,
+        filters: {
+          withinDistance: 100,
+          farmTypes: ["farm", "stall"],
+          includeStalls: true
+        }
+      })
+
       const { data: farms, error } = await searchFarmsWithFilters({
-        userLat: parseFloat(lat) || locationCordinates.lat,
-        userLon: parseFloat(lng) || locationCordinates.lng,
+        userLat: latitude,
+        userLon: longitude,
         filters: {
           withinDistance: 100,
           farmTypes: ["farm", "stall"],
@@ -106,9 +97,6 @@ const Index = () => {
       if (error) throw new Error(error as unknown as string);
 
       console.log("Farms fetched from searchFarmsWithFilters:", farms);
-
-      // const grouped = groupResultsByFarm(farms);
-      // console.log("Final grouped farms:", grouped);
       
       return farms;
     } catch (error) {
@@ -118,131 +106,23 @@ const Index = () => {
     }
   }
 
-  function groupResultsByFarm(results) {
-    const grouped = {};
+  const handleSearch = async () => {
+    try {
+      // I have used URLSearchParams because useSearchParams from react-router-dom was not updating the query parameters in real time
+      const params = new URLSearchParams(window.location.search);
+      const searchLat = params.get('lat');
+      const searchLng = params.get('lng');
 
-    results.forEach(result => {
-        const farmId = result.farm_id;
-
-        if (!grouped[farmId]) {
-            grouped[farmId] = {
-                farm: null,
-                stalls: []
-            };
-        }
-
-        if (result.record_type === 'farm') {
-            grouped[farmId].farm = {
-                id: result.farm_id,
-                farmer_id: result.farmer_id,
-                name: result.farm_name,
-                contact_person: result.contact_person,
-                email: result.email,
-                phone: result.phone,
-                address: result.address,
-                type: result.farm_type,
-                latitude: result.latitude,
-                longitude: result.longitude,
-                distance_meters: result.distance_meters,
-                distance_miles: result.distance_meters / 1609.34
-            };
-        } else if (result.record_type === 'stall') {
-            grouped[farmId].stalls.push({
-                stall_id: result.stall_id,
-                stall_name: result.stall_name,
-                stall_location: result.stall_location,
-                latitude: result.latitude,
-                longitude: result.longitude,
-                distance_meters: result.distance_meters,
-                distance_miles: result.distance_meters / 1609.34
-            });
-        }
-    });
-
-    const new_arr = [];
-
-    const array = Object.values(grouped).filter((g : any) => g.farm !== null);
-
-    for (const item of results) {
-      
+      await fetchFarms(parseFloat(searchLat), parseFloat(searchLng));
+    } catch (error) {
+      console.error("Error while handling search : ", error);
     }
-    
-    array.forEach((result:any) => {
-        const farm = result.farm;
-        const stalls = result.stalls;
-
-        if (stalls.length === 0) {
-            new_arr.push({
-                id: farm.id,
-                farm_id: farm.id,
-                name: farm.name,
-                contact_name: farm.contact_person,
-                email: farm.email,
-                phone: farm.phone,
-                address: farm.address,
-                type: 'farm',
-                latitude: farm.latitude,
-                longitude: farm.longitude,
-                distance: farm.distance_miles
-            });
-        } else if (stalls.length === 1) {
-            const stall = stalls[0];
-            new_arr.push({
-                id: stall.stall_id,
-                farm_id: farm.id,
-                name: stall.stall_name,
-                contact_name: farm.contact_person, // Use farm's contact person
-                email: farm.email, // Use farm's email
-                phone: farm.phone, // Use farm's phone
-                address: stall.stall_location || farm.address,
-                type: 'stall',
-                latitude: stall.latitude,
-                longitude: stall.longitude,
-                distance: stall.distance_miles
-            });
-        } else {
-            
-            // Add farm record
-            new_arr.push({
-                id: farm.id,
-                farm_id: farm.id,
-                name: farm.name,
-                contact_name: farm.contact_person,
-                email: farm.email,
-                phone: farm.phone,
-                address: farm.address,
-                type: 'farm',
-                latitude: farm.latitude,
-                longitude: farm.longitude,
-                distance: farm.distance_miles
-            });
-
-            // Add all stall records
-            stalls.forEach(stall => {
-                new_arr.push({
-                    id: stall.stall_id,
-                    farm_id: farm.id,
-                    name: stall.stall_name,
-                    contact_name: farm.contact_person,
-                    email: farm.email,
-                    phone: farm.phone,
-                    address: stall.stall_location || farm.address,
-                    type: 'stall',
-                    latitude: stall.latitude,
-                    longitude: stall.longitude,
-                    distance: stall.distance_miles
-                });
-            });
-        }
-    });
-    
-    return new_arr;
-}
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <Hero />
+      <Hero handleSearch={handleSearch} />
 
       <main className="container mx-auto px-4 py-8">
         <div className="flex flex-col lg:flex-row gap-6">
