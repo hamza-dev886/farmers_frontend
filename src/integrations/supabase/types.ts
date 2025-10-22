@@ -6451,6 +6451,7 @@ export type Database = {
           max_distance_meters?: number,
           farm_types?: string[],
           include_stalls?: boolean;
+          search_query?: string;
         }
         Returns: FarmMapDBRecord[]
       }

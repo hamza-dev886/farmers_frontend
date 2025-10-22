@@ -1,16 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
-import { FarmMapDBRecord } from "@/types/farm";
+import { FarmMapDBRecord, SearchFarmsWithFiltersType } from "@/types/farm";
 import { PostgrestError } from "@supabase/supabase-js";
-
-type SearchFarmsWithFiltersType = {
-    userLat: number;
-    userLon: number;
-    filters: null | {
-        withinDistance?: number;
-        farmTypes?: string[];
-        includeStalls?: boolean;
-    }
-}
 
 type ReturnType = {
     data: FarmMapDBRecord[] | [];
@@ -25,7 +15,8 @@ export async function searchFarmsWithFilters({
     const {
         withinDistance, // 5, 15, or 30 miles
         farmTypes, // Filter by farm types
-        includeStalls // Whether to include stall records for type='farm'
+        includeStalls, // Whether to include stall records for type='farm'
+        searchQuery // Search by name
     } = filters;
 
     const distanceInMeters = withinDistance ? withinDistance * 1609.34 : null;
@@ -36,7 +27,8 @@ export async function searchFarmsWithFilters({
             user_lon: userLon,
             max_distance_meters: distanceInMeters,
             farm_types: farmTypes,
-            include_stalls: includeStalls
+            include_stalls: includeStalls,
+            search_query: searchQuery
         });
 
     if (error) {

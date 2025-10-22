@@ -104,18 +104,22 @@ export const Hero = ({
   };
 
   const handleInputSearch = () => {
+    const queryObj: Record<string, any> = {};
+
     if (selectedLocation) {
       const [lng, lat] = selectedLocation.coordinates;
 
-      setSearchParams({ lng, lat })
+      queryObj.lng = lng;
+      queryObj.lat = lat;
+    }
 
-      if (searchQuery.trim()) {
-        setSearchParams({
-          ...searchParams,
-          q: searchQuery.trim()
-        })
-      }
+    if (searchQuery.trim()) {
+      queryObj.q = searchQuery.trim()
+    }
 
+    setSearchParams(queryObj);
+
+    if (Object.keys(queryObj).length) {
       handleSearch();
     }
   };
