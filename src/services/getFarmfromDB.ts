@@ -1,31 +1,48 @@
 import { supabase } from "@/integrations/supabase/client";
+import { FarmMapDBRecord } from "@/types/farm";
+import { PostgrestError } from "@supabase/supabase-js";
 
-export async function searchFarmsWithPostGIS({
+type SearchFarmsWithFiltersType = {
+    userLat: number;
+    userLon: number;
+    filters: null | {
+        withinDistance?: number;
+        farmTypes?: string[];
+        includeStalls?: boolean;
+    }
+}
+
+type ReturnType = {
+    data: FarmMapDBRecord[] | [];
+    error: PostgrestError
+}
+
+export async function searchFarmsWithFilters({
     userLat,
     userLon,
     filters = {}
-}) {
+}: SearchFarmsWithFiltersType): Promise<ReturnType> {
     const {
-        organic = false,
-        withinDistance = null,
-        farmTypes = [],
-        products = [],
-        features = [],
-        include_stalls = false
-    } = filters as any;
+        withinDistance, // 5, 15, or 30 miles
+        farmTypes, // Filter by farm types
+        includeStalls // Whether to include stall records for type='farm'
+    } = filters;
 
-    // Create a SQL query that handles the conditional coordinate selection
     const distanceInMeters = withinDistance ? withinDistance * 1609.34 : null;
 
-    let rpcQuery = (supabase as any).rpc('search_farms_by_location', {
-        user_lat: userLat,
-        user_lon: userLon,
-        max_distance_meters: distanceInMeters,
-        farm_types: farmTypes,
-        include_stalls: include_stalls,
-    });
+    const { data, error } = await supabase
+        .rpc('search_farms_by_distance', {
+            user_lat: userLat,
+            user_lon: userLon,
+            max_distance_meters: distanceInMeters,
+            farm_types: farmTypes,
+            include_stalls: includeStalls
+        });
 
-    const { data, error } = await rpcQuery;
+    if (error) {
+        console.error('Error fetching farms:', error);
+        return { data: [], error };
+    }
 
     return { data: data || [], error };
 }

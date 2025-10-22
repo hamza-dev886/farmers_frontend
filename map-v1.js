@@ -20,81 +20,95 @@ async function searchFarmsWithFilters({
     userLon,
     filters = {}
 }) {
-    // Extract filter values
     const {
         withinDistance = null, // 5, 15, or 30 miles
+        farmTypes = [], // Filter by farm types
+        includeStalls = true // Whether to include stall records for type='farm'
     } = filters;
 
-    // Convert miles to meters for distance calculations
     const distanceInMeters = withinDistance ? withinDistance * 1609.34 : null;
 
-    // Start with base query
-    let query = supabase
-        .from('farm_locations_view')
-        .select('*');
-
-    // Execute the query
-    const { data: farms, error } = await query;
+    // Use the RPC function for efficient distance-based search
+    const { data, error } = await supabase
+        .rpc('search_farms_by_distance', {
+            user_lat: userLat,
+            user_lon: userLon,
+            max_distance_meters: distanceInMeters,
+            farm_types: farmTypes,
+            include_stalls: includeStalls
+        });
 
     if (error) {
         console.error('Error fetching farms:', error);
         return { data: [], error };
     }
 
-    // Filter by distance if needed
-    let filteredFarms = farms;
+    // Group the results by farm if needed
+    // const groupedResults = groupResultsByFarm(data);
 
-    if (distanceInMeters && userLat && userLon) {
-        filteredFarms = farms.map(farm => {
-            // Calculate distance using the effective coordinates from the view
-            const distance = calculateDistance(
-                userLat, 
-                userLon, 
-                farm.effective_latitude, 
-                farm.effective_longitude
-            );
+    return { 
+        data: data || [], 
+        // groupedData: groupedResults,
+        error: null 
+    };
+}
 
-            // Add distance to the farm object
-            return {
-                ...farm,
-                distance_meters: distance,
-                distance_miles: distance / 1609.34
+// Helper function to group results by farm
+function groupResultsByFarm(results) {
+    const grouped = {};
+
+    results.forEach(result => {
+        const farmId = result.id;
+
+        if (!grouped[farmId]) {
+            grouped[farmId] = {
+                farm: null,
+                stalls: []
             };
-        }).filter(farm => farm.distance_meters <= distanceInMeters)
-          .sort((a, b) => a.distance_meters - b.distance_meters); // Sort by distance
-    }
+        }
 
-    return { data: filteredFarms, error: null };
+        if (result.record_type === 'farm' || result.record_type === 'stall-only') {
+            grouped[farmId].farm = {
+                id: result.id,
+                farmer_id: result.farmer_id,
+                name: result.name,
+                contact_person: result.contact_person,
+                email: result.email,
+                phone: result.phone,
+                address: result.address,
+                type: result.type,
+                latitude: result.latitude,
+                longitude: result.longitude,
+                distance_meters: result.distance_meters,
+                distance_miles: result.distance_meters / 1609.34
+            };
+        } else if (result.record_type === 'stall') {
+            grouped[farmId].stalls.push({
+                stall_id: result.stall_id,
+                stall_name: result.stall_name,
+                stall_location: result.stall_location,
+                latitude: result.latitude,
+                longitude: result.longitude,
+                distance_meters: result.distance_meters,
+                distance_miles: result.distance_meters / 1609.34
+            });
+        }
+    });
+
+    // Convert to array and filter out entries without farm data
+    return Object.values(grouped).filter(g => g.farm !== null);
 }
 
-// Helper function to calculate distance between two points
-function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371000; // Earth's radius in meters
-    const φ1 = lat1 * Math.PI / 180;
-    const φ2 = lat2 * Math.PI / 180;
-    const Δφ = (lat2 - lat1) * Math.PI / 180;
-    const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-        Math.cos(φ1) * Math.cos(φ2) *
-        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c; // Distance in meters
-}
-
-// Example usage
-const results = await searchFarmsWithFilters({
+// Example usage - Get all results
+const allResults = await searchFarmsWithFilters({
     userLat: 40.7128,
     userLon: -74.0060,
     filters: {
-        // organic: true,
         // withinDistance: 5, // 5 miles
-        // farmTypes: ['Family Farms', 'Farm Stalls'],
-        // products: ['Vegetables', 'Fruits'],
-        // features: ['Organic Certified', 'Farm Tours']
+        farmTypes: ['farm'], // Get both types
+        includeStalls: true
     }
 });
 
-console.log(results);
+console.log('Flat results:', allResults.data);
+// console.log('Grouped by farm:', allResults.groupedData);
