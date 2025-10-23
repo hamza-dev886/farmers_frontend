@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const FilterSidebar = () => {
   const [openSections, setOpenSections] = useState({
@@ -16,12 +17,52 @@ export const FilterSidebar = () => {
     features: true
   });
 
+  const [openProducts, setOpenProducts] = useState<Record<string, boolean>>({});
+  const [products, setProducts] = useState<any>()
+
   const toggleSection = (section: keyof typeof openSections) => {
     setOpenSections(prev => ({
       ...prev,
       [section]: !prev[section]
     }));
   };
+
+  const toggleProduct = (category: string) => {
+    setOpenProducts(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const { data, error } = await (supabase as any)
+        .from('categories')
+        .select(`
+        id,
+        name,
+        sub_categories:sub_categories_category_id_fkey (
+          id,
+          name
+        )
+      `)
+      .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching categories:', error);
+        return;
+      }
+
+      console.log('Fetched categories:', data);
+
+      if (data) {
+        setProducts(data)
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
 
   return (
     <div className="bg-card rounded-lg border p-6 space-y-4">
@@ -82,22 +123,40 @@ export const FilterSidebar = () => {
             {openSections.products ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
           </CollapsibleTrigger>
           <CollapsibleContent className="px-2 pb-2 space-y-2">
-            <div className="flex items-center space-x-2">
-              <Checkbox id="vegetables" />
-              <label htmlFor="vegetables" className="text-xs">Vegetables</label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox id="fruits" />
-              <label htmlFor="fruits" className="text-xs">Fruits</label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox id="dairy" />
-              <label htmlFor="dairy" className="text-xs">Dairy</label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox id="meat" />
-              <label htmlFor="meat" className="text-xs">Meat</label>
-            </div>
+            {products && products.map((product) => (
+              <Collapsible
+                key={product.id}
+                open={openProducts[product.id]}
+                onOpenChange={() => toggleProduct(product.id)}
+              >
+                <CollapsibleTrigger className="flex items-start justify-between space-x-2 w-full hover:bg-muted/50 rounded px-1 py-1">
+                  <div className="flex flex-row gap-4">
+                    <Checkbox
+                      id={product.id}
+                      checked={openProducts[product.id]}
+                      onCheckedChange={() => toggleProduct(product.id)}
+                    />
+                    <label htmlFor={product.id} className="text-xs flex-1 cursor-pointer">
+                      {product.name}
+                    </label>
+                  </div>
+                  {openProducts[product.id] ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="ml-6 mt-1 space-y-1">
+                  {product.sub_categories.map((subCategory) => (
+                    <div key={subCategory.id} className="flex items-center space-x-2">
+                      <Checkbox id={subCategory.id} />
+                      <label
+                        htmlFor={subCategory.id}
+                        className="text-xs text-muted-foreground cursor-pointer"
+                      >
+                        {subCategory.name}
+                      </label>
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+            ))}
           </CollapsibleContent>
         </Collapsible>
 
@@ -151,7 +210,7 @@ export const FilterSidebar = () => {
       </div>
 
       <Separator />
-      
+
       <Button className="w-full h-8 text-xs">
         Apply Filters
       </Button>
