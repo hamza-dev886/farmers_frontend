@@ -100,6 +100,11 @@ CREATE INDEX idx_farm_locations_coords ON farm_locations_view (latitude, longitu
 
 -- REFRESH MATERIALIZED VIEW CONCURRENTLY farm_locations_view;
 
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE INDEX IF NOT EXISTS idx_farm_locations_name_trgm ON farm_locations_view USING gin (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_farm_locations_stall_name_trgm ON farm_locations_view USING gin (stall_name gin_trgm_ops);
+
 -- Create a unique index for concurrent refresh
 
 -- Function to refresh the materialized view
