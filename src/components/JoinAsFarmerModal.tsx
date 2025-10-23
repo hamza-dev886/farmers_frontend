@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchCategories, Category } from "@/services/categoryService";
 
 const farmerApplicationSchema = z.object({
   joiningType: z.enum(["farm", "stall"]),
@@ -57,12 +58,6 @@ const socialPlatforms = [
   { value: "instagram", label: "Instagram", icon: Instagram }
 ];
 
-const productOptions = [
-  "Fruits", "Vegetables", "Herbs", "Dairy Products", "Eggs",
-  "Meat & Poultry", "Grains & Cereals", "Honey & Bee Products",
-  "Flowers & Plants", "Preserved Foods", "Organic Products", "Firewood", "Not Listed"
-];
-
 interface JoinAsFarmerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -75,6 +70,7 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
   const [farmImageFile, setFarmImageFile] = useState<File | null>(null);
   const [farmImagePreview, setFarmImagePreview] = useState<string | null>(null);
   const [socialLinksCount, setSocialLinksCount] = useState(1);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   // Reset image state when modal closes
   const handleModalChange = (open: boolean) => {
@@ -119,6 +115,18 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
 
   const joiningType = form.watch('joiningType');
   const isFarm = joiningType === 'farm';
+
+  // Fetch categories on component mount
+  useEffect(() => {
+    const loadCategories = async () => {
+      const data = await fetchCategories();
+      if (data) {
+        setCategories(data);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   const onSubmit = async (data: FarmerApplicationForm) => {
     setIsSubmitting(true);
@@ -623,20 +631,20 @@ export function JoinAsFarmerModal({ open, onOpenChange }: JoinAsFarmerModalProps
                   <p className="text-sm text-muted-foreground">Select all product types that apply to your {isFarm ? 'farm' : 'stall'}:</p>
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {productOptions.map((product) => (
-                      <div key={product} className="flex items-center space-x-2">
+                    {categories.map((category) => (
+                      <div key={category.id} className="flex items-center space-x-2">
                         <Checkbox
-                          id={product}
-                          checked={form.watch("products").includes(product)}
+                          id={category.id}
+                          checked={form.watch("products").includes(category.id)}
                           onCheckedChange={(checked) =>
-                            handleProductChange(product, checked as boolean)
+                            handleProductChange(category.id, checked as boolean)
                           }
                         />
                         <label
-                          htmlFor={product}
+                          htmlFor={category.id}
                           className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                         >
-                          {product}
+                          {category.name}
                         </label>
                       </div>
                     ))}

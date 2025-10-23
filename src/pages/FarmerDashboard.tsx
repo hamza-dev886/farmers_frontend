@@ -1221,7 +1221,7 @@ const FarmerDashboard = () => {
                     {canAddMultipleFarms() && (
                       <Button onClick={() => setAddFarmModalOpen(true)}>
                         <Plus className="h-4 w-4 mr-2" />
-                        Add {farmType === "stall" ? "Stall" : "farm"}arm
+                        Add {farmType === "stall" ? "Stall" : "farm"}
                       </Button>
                     )}
                     <Button onClick={() => navigate(`/farm/${selectedFarm?.id}`)} disabled={!selectedFarm}>
