@@ -13,12 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Package, 
-  BarChart3, 
-  Plus, 
-  Edit, 
-  Trash, 
+import {
+  Package,
+  BarChart3,
+  Plus,
+  Edit,
+  Trash,
   Eye,
   ArrowLeft,
   Wheat,
@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { User } from "@supabase/supabase-js";
+import { fetchCategories, Category } from "@/services/categoryService";
 
 interface FarmData {
   id: string;
@@ -48,6 +49,8 @@ interface Product {
   status: string;
   created_at: string;
   updated_at: string;
+  category_id?: string;
+  sub_category_id?: string;
 }
 
 interface Inventory {
@@ -104,8 +107,35 @@ const FarmDashboard = () => {
   const [inventoryFormData, setInventoryFormData] = useState<Partial<Inventory>>({});
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [availableSubCategories, setAvailableSubCategories] = useState<any[]>([]);
+  const [isCustomSubCategory, setIsCustomSubCategory] = useState(false);
+  const [customSubCategoryName, setCustomSubCategoryName] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Fetch categories on component mount
+  useEffect(() => {
+    const loadCategories = async () => {
+      const data = await fetchCategories();
+      if (data) {
+        setCategories(data);
+      }
+    };
+
+    loadCategories();
+  }, []);
+
+  // Update available subcategories when category changes
+  useEffect(() => {
+    if (selectedCategoryId) {
+      const selectedCategory = categories.find(cat => cat.id === selectedCategoryId);
+      setAvailableSubCategories(selectedCategory?.sub_categories || []);
+    } else {
+      setAvailableSubCategories([]);
+    }
+  }, [selectedCategoryId, categories]);
 
   useEffect(() => {
     checkUserAuth();
@@ -114,7 +144,7 @@ const FarmDashboard = () => {
   const checkUserAuth = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (!session?.user) {
         navigate('/');
         return;
@@ -151,7 +181,7 @@ const FarmDashboard = () => {
 
   const fetchFarmData = async () => {
     if (!farmId) return;
-    
+
     try {
       const { data, error } = await supabase
         .from('farms')
@@ -161,7 +191,7 @@ const FarmDashboard = () => {
 
       if (error) throw error;
       setFarmData(data);
-      
+
       await fetchProducts();
       await fetchInventory();
     } catch (error) {
@@ -198,7 +228,7 @@ const FarmDashboard = () => {
 
       const formattedProducts = (data || []).map(item => ({
         id: item.product?.id || '',
-        title: item.product?.title || item.product?.handle || 'Untitled Product', 
+        title: item.product?.title || item.product?.handle || 'Untitled Product',
         description: item.product?.description || '',
         handle: item.product?.handle || '',
         status: item.product?.status || 'draft',
@@ -207,11 +237,11 @@ const FarmDashboard = () => {
       }));
 
       setProducts(formattedProducts);
-      
+
       // Update stats
       const total = formattedProducts.length;
       const active = formattedProducts.filter(p => p.status === 'published').length;
-      
+
       setStats(prev => ({
         ...prev,
         totalProducts: total,
@@ -234,12 +264,12 @@ const FarmDashboard = () => {
       if (error) throw error;
 
       setInventory(data || []);
-      
+
       // Update stats for low stock items
-      const lowStock = (data || []).filter(item => 
+      const lowStock = (data || []).filter(item =>
         item.quantity_available <= item.low_stock_threshold
       ).length;
-      
+
       setStats(prev => ({
         ...prev,
         lowStockItems: lowStock
@@ -331,10 +361,64 @@ const FarmDashboard = () => {
       return;
     }
 
+    if (isCustomSubCategory && customSubCategoryName.trim()) {
+      // Check if custom subcategory already exists
+      const { data: existingSubCategories, error: checkError } = await (supabase as any)
+        .from('sub_categories')
+        .select('id, name')
+        .eq('category_id', productFormData.category_id)
+        .ilike('name', customSubCategoryName.trim());
+
+      if (checkError) {
+        console.error('Error checking subcategory:', checkError);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to verify subcategory. Please try again."
+        });
+        return;
+      }
+
+      if (existingSubCategories && existingSubCategories.length > 0) {
+        toast({
+          variant: "destructive",
+          title: "Subcategory Already Exists",
+          description: `"${customSubCategoryName}" already exists. Please use the dropdown to select it or choose a different name.`
+        });
+        return;
+      }
+
+      // Create new custom subcategory
+      const { data: newSubCategory, error: createError } = await (supabase as any)
+        .from('sub_categories')
+        .insert({
+          category_id: productFormData.category_id,
+          name: customSubCategoryName.trim()
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating subcategory:', createError);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to create custom subcategory. Please try again."
+        });
+        return;
+      }
+
+      productFormData.sub_category_id = newSubCategory.id;
+
+      toast({
+        title: "Custom Subcategory Created",
+        description: `"${customSubCategoryName}" has been created successfully.`
+      });
+    }
+
     try {
       // Create a unique handle from title if not provided
       const productHandle = productFormData.handle || productFormData.title?.toLowerCase().replace(/\s+/g, '-') || '';
-      
       // Create product first - the product table requires an ID to be provided
       const productId = crypto.randomUUID();
       const { data: productData, error: productError } = await supabase
@@ -342,7 +426,11 @@ const FarmDashboard = () => {
         .insert({
           id: productId,
           handle: productHandle,
-          title: productFormData.title || 'Untitled Product'
+          title: productFormData.title || 'Untitled Product',
+          description: productFormData.description,
+          status: productFormData.status || 'draft',
+          category_id: productFormData.category_id || null,
+          sub_category_id: productFormData.sub_category_id || null
         })
         .select()
         .single();
@@ -366,6 +454,9 @@ const FarmDashboard = () => {
 
       setProductModalOpen(false);
       setProductFormData({});
+      setSelectedCategoryId("");
+      setIsCustomSubCategory(false);
+      setCustomSubCategoryName("");
       await fetchProducts();
     } catch (error) {
       console.error('Error adding product:', error);
@@ -394,7 +485,9 @@ const FarmDashboard = () => {
           title: productFormData.title,
           handle: productFormData.handle || productFormData.title?.toLowerCase().replace(/\s+/g, '-') || '',
           description: productFormData.description,
-          status: productFormData.status
+          status: productFormData.status,
+          category_id: productFormData.category_id || null,
+          sub_category_id: productFormData.sub_category_id || null
         })
         .eq('id', editingItem);
 
@@ -408,6 +501,9 @@ const FarmDashboard = () => {
       setProductModalOpen(false);
       setEditingItem(null);
       setProductFormData({});
+      setSelectedCategoryId("");
+      setIsCustomSubCategory(false);
+      setCustomSubCategoryName("");
       await fetchProducts();
     } catch (error) {
       console.error('Error updating product:', error);
@@ -461,6 +557,9 @@ const FarmDashboard = () => {
   const openEditProduct = (product: Product) => {
     setEditingItem(product.id);
     setProductFormData(product);
+    setSelectedCategoryId(product.category_id || "");
+    setIsCustomSubCategory(false);
+    setCustomSubCategoryName("");
     setProductModalOpen(true);
   };
 
@@ -489,8 +588,8 @@ const FarmDashboard = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => navigate('/farmer-dashboard')}
               className="flex items-center gap-2"
             >
@@ -517,7 +616,7 @@ const FarmDashboard = () => {
               <div className="text-2xl font-bold">{stats.totalProducts}</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Active Products</CardTitle>
@@ -527,7 +626,7 @@ const FarmDashboard = () => {
               <div className="text-2xl font-bold text-green-600">{stats.activeProducts}</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
@@ -537,7 +636,7 @@ const FarmDashboard = () => {
               <div className="text-2xl font-bold text-yellow-600">{stats.lowStockItems}</div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Plan Limit</CardTitle>
@@ -557,7 +656,7 @@ const FarmDashboard = () => {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="products">Products</TabsTrigger>
           </TabsList>
-          
+
           {/* Overview Tab */}
           <TabsContent value="overview">
             <Card>
@@ -591,7 +690,7 @@ const FarmDashboard = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="space-y-4">
                       <div>
                         <h3 className="text-lg font-semibold mb-2">Location & Description</h3>
@@ -624,7 +723,7 @@ const FarmDashboard = () => {
           {/* Products Tab */}
           <TabsContent value="products">
             <Card>
-               <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>Products</CardTitle>
                   <CardDescription>Manage your farm products and listings</CardDescription>
@@ -634,7 +733,7 @@ const FarmDashboard = () => {
                     <Package className="h-4 w-4 mr-2" />
                     Full Inventory
                   </Button>
-                  <Button 
+                  <Button
                     onClick={() => setProductModalOpen(true)}
                     disabled={currentPlan?.max_products !== 0 && stats.totalProducts >= (currentPlan?.max_products || 0)}
                   >
@@ -694,7 +793,7 @@ const FarmDashboard = () => {
                 {currentPlan?.max_products !== 0 && stats.totalProducts >= (currentPlan?.max_products || 0) && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
                     <p className="text-sm text-yellow-800">
-                      You've reached your plan limit of {currentPlan?.max_products} products. 
+                      You've reached your plan limit of {currentPlan?.max_products} products.
                       Upgrade your plan to add more products.
                     </p>
                   </div>
@@ -714,44 +813,44 @@ const FarmDashboard = () => {
                 {editingItem ? 'Update product information' : 'Add a new product to your farm'}
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="product-title">Product Title *</Label>
                 <Input
                   id="product-title"
                   value={productFormData.title || ''}
-                  onChange={(e) => setProductFormData({...productFormData, title: e.target.value})}
+                  onChange={(e) => setProductFormData({ ...productFormData, title: e.target.value })}
                   placeholder="Enter product title"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="product-description">Description *</Label>
                 <Textarea
                   id="product-description"
                   value={productFormData.description || ''}
-                  onChange={(e) => setProductFormData({...productFormData, description: e.target.value})}
+                  onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
                   placeholder="Describe your product"
                   rows={3}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="product-handle">Handle</Label>
                 <Input
                   id="product-handle"
                   value={productFormData.handle || ''}
-                  onChange={(e) => setProductFormData({...productFormData, handle: e.target.value})}
+                  onChange={(e) => setProductFormData({ ...productFormData, handle: e.target.value })}
                   placeholder="product-handle (auto-generated if empty)"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="product-status">Status</Label>
                 <Select
                   value={productFormData.status || 'draft'}
-                  onValueChange={(value) => setProductFormData({...productFormData, status: value})}
+                  onValueChange={(value) => setProductFormData({ ...productFormData, status: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
@@ -762,13 +861,129 @@ const FarmDashboard = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="grid grid-row-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="product-category">Category</Label>
+                  <Select
+                    value={productFormData.category_id || ""}
+                    onValueChange={(value) => {
+                      setProductFormData({ ...productFormData, category_id: value, sub_category_id: "" });
+                      setSelectedCategoryId(value);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="product-sub-category">Sub Category</Label>
+                  <Select
+                    value={productFormData.sub_category_id || ""}
+                    onValueChange={(value) => {
+                      setProductFormData({ ...productFormData, sub_category_id: value });
+                    }}
+                    disabled={isCustomSubCategory || !productFormData.category_id || availableSubCategories.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={!productFormData.category_id ? "Select category first" : "Select a sub-category"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableSubCategories.map((subCategory) => (
+                        <SelectItem key={subCategory.id} value={subCategory.id}>
+                          {subCategory.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {!isCustomSubCategory ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={() => {
+                        setIsCustomSubCategory(true);
+                        setProductFormData({ ...productFormData, sub_category_id: "" });
+                      }}
+                      disabled={!productFormData.category_id}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Custom Subcategory
+                    </Button>
+                  ) : (
+                    <div className="space-y-2 mt-2">
+                      <Input
+                        id="custom-subcategory"
+                        value={customSubCategoryName}
+                        onChange={(e) => setCustomSubCategoryName(e.target.value)}
+                        placeholder="Enter custom subcategory name"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className=" w-32"
+                          onClick={() => {
+                            setIsCustomSubCategory(false);
+                            setCustomSubCategoryName("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        {/* <Button
+                          type="button"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => {
+                            if (customSubCategoryName.trim()) {
+                              // Store the custom name in a special way (you might want to save this differently)
+                              setProductFormData({ 
+                                ...productFormData, 
+                                sub_category_id: `custom_${customSubCategoryName}` 
+                              });
+                              toast({
+                                title: "Custom Subcategory Added",
+                                description: `"${customSubCategoryName}" will be created.`
+                              });
+                              setIsCustomSubCategory(false);
+                            } else {
+                              toast({
+                                variant: "destructive",
+                                title: "Error",
+                                description: "Please enter a subcategory name."
+                              });
+                            }
+                          }}
+                        >
+                          Save
+                        </Button> */}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-            
+
             <DialogFooter>
               <Button variant="outline" onClick={() => {
                 setProductModalOpen(false);
                 setEditingItem(null);
                 setProductFormData({});
+                setSelectedCategoryId("");
+                setIsCustomSubCategory(false);
+                setCustomSubCategoryName("");
               }}>
                 Cancel
               </Button>
