@@ -41,7 +41,6 @@ export const Hero = ({
   // Update token when config data loads
   useEffect(() => {
     if (configData?.value) {
-      console.log('Mapbox token loaded from config.', configData.value);
       setMapboxToken(configData.value);
     }
   }, [configData]);
