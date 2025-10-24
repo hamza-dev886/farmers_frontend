@@ -27,6 +27,7 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { User } from "@supabase/supabase-js";
 import { fetchCategories, Category } from "@/services/categoryService";
+import { sub } from "date-fns";
 
 interface FarmData {
   id: string;
@@ -112,18 +113,21 @@ const FarmDashboard = () => {
   const [availableSubCategories, setAvailableSubCategories] = useState<any[]>([]);
   const [isCustomSubCategory, setIsCustomSubCategory] = useState(false);
   const [customSubCategoryName, setCustomSubCategoryName] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Helper function to load categories
+  const loadCategories = async () => {
+    const data = await fetchCategories();
+    if (data) {
+      setCategories(data);
+    }
+  };
+
   // Fetch categories on component mount
   useEffect(() => {
-    const loadCategories = async () => {
-      const data = await fetchCategories();
-      if (data) {
-        setCategories(data);
-      }
-    };
-
     loadCategories();
   }, []);
 
@@ -136,6 +140,18 @@ const FarmDashboard = () => {
       setAvailableSubCategories([]);
     }
   }, [selectedCategoryId, categories]);
+
+  // Load subcategories when editing a product
+  useEffect(() => {
+    if (editingItem && productFormData.category_id && categories.length > 0) {
+      const selectedCategory = categories.find(cat => cat.id === productFormData.category_id);
+      console.log('Setting available subcategories for editing item:', selectedCategory);
+      if (selectedCategory) {
+        setAvailableSubCategories(selectedCategory.sub_categories || []);
+        setSelectedCategoryId(productFormData.category_id);
+      }
+    }
+  }, [editingItem, productFormData.category_id, categories]);
 
   useEffect(() => {
     checkUserAuth();
@@ -208,30 +224,42 @@ const FarmDashboard = () => {
     if (!farmId) return;
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('farm_products')
         .select(`
           product_id,
           product (
+          id,
+          title,
+          handle,
+          description,
+          status,
+          created_at,
+          updated_at,
+          category:category_id (
             id,
-            title,
-            handle,
-            description,
-            status,
-            created_at,
-            updated_at
-          )
-        `)
+            name
+         ),
+          sub_category:sub_category_id (
+            id,
+            name
+        )
+       )
+  `)
         .eq('farm_id', farmId);
+
+      console.log('Fetched products data:', data);
 
       if (error) throw error;
 
-      const formattedProducts = (data || []).map(item => ({
+      const formattedProducts = (data || []).map((item: any) => ({
         id: item.product?.id || '',
         title: item.product?.title || item.product?.handle || 'Untitled Product',
         description: item.product?.description || '',
         handle: item.product?.handle || '',
         status: item.product?.status || 'draft',
+        category_id: item.product?.category?.id || '',
+        sub_category_id: item.product?.sub_category?.id || '',
         created_at: item.product?.created_at || '',
         updated_at: item.product?.updated_at || ''
       }));
@@ -351,75 +379,138 @@ const FarmDashboard = () => {
     }
   };
 
+  const isFormValid = (): boolean => {
+    // Check all required fields
+    const hasTitle = productFormData.title?.trim() && productFormData.title.trim().length >= 2;
+    const hasDescription = productFormData.description?.trim() && productFormData.description.trim().length >= 10;
+    const hasCategory = !!productFormData.category_id;
+
+    // Check subcategory: either regular subcategory selected OR custom subcategory name provided
+    const hasSubCategory = isCustomSubCategory
+      ? customSubCategoryName.trim().length > 0
+      : !!productFormData.sub_category_id;
+
+    return hasTitle && hasDescription && hasCategory && hasSubCategory;
+  };
+
+  const validateProductForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!productFormData.title?.trim()) {
+      errors.title = "Product title is required";
+    } else if (productFormData.title.trim().length < 2) {
+      errors.title = "Product title must be at least 2 characters";
+    }
+
+    if (!productFormData.description?.trim()) {
+      errors.description = "Product description is required";
+    } else if (productFormData.description.trim().length < 10) {
+      errors.description = "Product description must be at least 10 characters";
+    }
+
+    if (!productFormData.category_id) {
+      errors.category = "Please select a category";
+    }
+
+    if (!isCustomSubCategory && !productFormData.sub_category_id) {
+      errors.subCategory = "Please select a subcategory or add a custom one";
+    }
+
+    if (isCustomSubCategory && !customSubCategoryName.trim()) {
+      errors.customSubCategory = "Please enter a subcategory name or cancel";
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleAddProduct = async () => {
-    if (!farmId || !productFormData.title || !productFormData.description) {
+    // Clear previous validation errors
+    setValidationErrors({});
+
+    // Validate form
+    if (!validateProductForm()) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Please fill in all required fields."
+        title: "Validation Error",
+        description: "Please fix the errors in the form."
       });
       return;
     }
 
-    if (isCustomSubCategory && customSubCategoryName.trim()) {
-      // Check if custom subcategory already exists
-      const { data: existingSubCategories, error: checkError } = await (supabase as any)
-        .from('sub_categories')
-        .select('id, name')
-        .eq('category_id', productFormData.category_id)
-        .ilike('name', customSubCategoryName.trim());
-
-      if (checkError) {
-        console.error('Error checking subcategory:', checkError);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to verify subcategory. Please try again."
-        });
-        return;
-      }
-
-      if (existingSubCategories && existingSubCategories.length > 0) {
-        toast({
-          variant: "destructive",
-          title: "Subcategory Already Exists",
-          description: `"${customSubCategoryName}" already exists. Please use the dropdown to select it or choose a different name.`
-        });
-        return;
-      }
-
-      // Create new custom subcategory
-      const { data: newSubCategory, error: createError } = await (supabase as any)
-        .from('sub_categories')
-        .insert({
-          category_id: productFormData.category_id,
-          name: customSubCategoryName.trim()
-        })
-        .select()
-        .single();
-
-      if (createError) {
-        console.error('Error creating subcategory:', createError);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to create custom subcategory. Please try again."
-        });
-        return;
-      }
-
-      productFormData.sub_category_id = newSubCategory.id;
-
+    if (!farmId) {
       toast({
-        title: "Custom Subcategory Created",
-        description: `"${customSubCategoryName}" has been created successfully.`
+        variant: "destructive",
+        title: "Error",
+        description: "Farm ID is missing."
       });
+      return;
     }
 
+    setIsSubmitting(true);
+
     try {
+      if (isCustomSubCategory && customSubCategoryName.trim()) {
+        // Check if custom subcategory already exists
+        const { data: existingSubCategories, error: checkError } = await (supabase as any)
+          .from('sub_categories')
+          .select('id, name')
+          .eq('category_id', productFormData.category_id)
+          .ilike('name', customSubCategoryName.trim());
+
+        if (checkError) {
+          console.error('Error checking subcategory:', checkError);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to verify subcategory. Please try again."
+          });
+          return;
+        }
+
+        if (existingSubCategories && existingSubCategories.length > 0) {
+          toast({
+            variant: "destructive",
+            title: "Subcategory Already Exists",
+            description: `"${customSubCategoryName}" already exists. Please use the dropdown to select it or choose a different name.`
+          });
+          return;
+        }
+
+        // Create new custom subcategory
+        const { data: newSubCategory, error: createError } = await (supabase as any)
+          .from('sub_categories')
+          .insert({
+            category_id: productFormData.category_id,
+            name: customSubCategoryName.trim()
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating subcategory:', createError);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to create custom subcategory. Please try again."
+          });
+          return;
+        }
+
+        productFormData.sub_category_id = newSubCategory.id;
+
+        // Reload categories to include the new subcategory
+        await loadCategories();
+
+        toast({
+          title: "Custom Subcategory Created",
+          description: `"${customSubCategoryName}" has been created successfully.`
+        });
+      }
+
       const productId = crypto.randomUUID();
       // Create a unique handle from title if not provided
-      const productHandle = productFormData.handle || productFormData.title?.toLowerCase().replace(/\s+/g, '-') + "-" + productId;
+      const productHandle = productFormData.handle || productFormData.title?.toLowerCase().replace(/\s+/g, '-') || '';
       // Create product first - the product table requires an ID to be provided
       const { data: productData, error: productError } = await supabase
         .from('product')
@@ -465,20 +556,95 @@ const FarmDashboard = () => {
         title: "Error",
         description: "Failed to add product."
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleUpdateProduct = async () => {
-    if (!editingItem || !productFormData.title || !productFormData.description) {
+    // Clear previous validation errors
+    setValidationErrors({});
+
+    // Validate form
+    if (!validateProductForm()) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Please fill in all required fields."
+        title: "Validation Error",
+        description: "Please fix the errors in the form."
       });
       return;
     }
 
+    if (!editingItem) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No product selected for editing."
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
     try {
+      if (isCustomSubCategory && customSubCategoryName.trim()) {
+        // Check if custom subcategory already exists
+        const { data: existingSubCategories, error: checkError } = await (supabase as any)
+          .from('sub_categories')
+          .select('id, name')
+          .eq('category_id', productFormData.category_id)
+          .ilike('name', customSubCategoryName.trim());
+
+        if (checkError) {
+          console.error('Error checking subcategory:', checkError);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to verify subcategory. Please try again."
+          });
+          return;
+        }
+
+        if (existingSubCategories && existingSubCategories.length > 0) {
+          toast({
+            variant: "destructive",
+            title: "Subcategory Already Exists",
+            description: `"${customSubCategoryName}" already exists. Please use the dropdown to select it or choose a different name.`
+          });
+          return;
+        }
+
+        // Create new custom subcategory
+        const { data: newSubCategory, error: createError } = await (supabase as any)
+          .from('sub_categories')
+          .insert({
+            category_id: productFormData.category_id,
+            name: customSubCategoryName.trim()
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating subcategory:', createError);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to create custom subcategory. Please try again."
+          });
+          return;
+        }
+
+        productFormData.sub_category_id = newSubCategory.id;
+
+        // Reload categories to include the new subcategory
+        await loadCategories();
+
+        toast({
+          title: "Custom Subcategory Created",
+          description: `"${customSubCategoryName}" has been created successfully.`
+        });
+      }
+
       const { error } = await supabase
         .from('product')
         .update({
@@ -512,6 +678,8 @@ const FarmDashboard = () => {
         title: "Error",
         description: "Failed to update product."
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -556,8 +724,18 @@ const FarmDashboard = () => {
 
   const openEditProduct = (product: Product) => {
     setEditingItem(product.id);
-    setProductFormData(product);
-    setSelectedCategoryId(product.category_id || "");
+    setProductFormData({
+      ...product,
+      category_id: product.category_id || "",
+      sub_category_id: product.sub_category_id || ""
+    });
+    console.log('Editing product, form data set to:', product)
+    // Set selected category to trigger subcategories loading
+    if (product.category_id) {
+      setSelectedCategoryId(product.category_id);
+    } else {
+      setSelectedCategoryId("");
+    }
     setIsCustomSubCategory(false);
     setCustomSubCategoryName("");
     setProductModalOpen(true);
@@ -805,7 +983,17 @@ const FarmDashboard = () => {
         </Tabs>
 
         {/* Product Modal */}
-        <Dialog open={productModalOpen} onOpenChange={setProductModalOpen}>
+        <Dialog open={productModalOpen} onOpenChange={(open) => {
+          setProductModalOpen(open);
+          if (!open) {
+            setEditingItem(null);
+            setProductFormData({});
+            setSelectedCategoryId("");
+            setIsCustomSubCategory(false);
+            setCustomSubCategoryName("");
+            setValidationErrors({});
+          }
+        }}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>{editingItem ? 'Edit Product' : 'Add New Product'}</DialogTitle>
@@ -820,9 +1008,19 @@ const FarmDashboard = () => {
                 <Input
                   id="product-title"
                   value={productFormData.title || ''}
-                  onChange={(e) => setProductFormData({ ...productFormData, title: e.target.value })}
+                  onChange={(e) => {
+                    setProductFormData({ ...productFormData, title: e.target.value });
+                    if (validationErrors.title) {
+                      setValidationErrors({ ...validationErrors, title: '' });
+                    }
+                  }}
                   placeholder="Enter product title"
+                  disabled={isSubmitting}
+                  className={validationErrors.title ? 'border-red-500' : ''}
                 />
+                {validationErrors.title && (
+                  <p className="text-sm text-red-500">{validationErrors.title}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -830,10 +1028,20 @@ const FarmDashboard = () => {
                 <Textarea
                   id="product-description"
                   value={productFormData.description || ''}
-                  onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
+                  onChange={(e) => {
+                    setProductFormData({ ...productFormData, description: e.target.value });
+                    if (validationErrors.description) {
+                      setValidationErrors({ ...validationErrors, description: '' });
+                    }
+                  }}
                   placeholder="Describe your product"
                   rows={3}
+                  disabled={isSubmitting}
+                  className={validationErrors.description ? 'border-red-500' : ''}
                 />
+                {validationErrors.description && (
+                  <p className="text-sm text-red-500">{validationErrors.description}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -843,6 +1051,7 @@ const FarmDashboard = () => {
                   value={productFormData.handle || ''}
                   onChange={(e) => setProductFormData({ ...productFormData, handle: e.target.value })}
                   placeholder="product-handle (auto-generated if empty)"
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -851,6 +1060,7 @@ const FarmDashboard = () => {
                 <Select
                   value={productFormData.status || 'draft'}
                   onValueChange={(value) => setProductFormData({ ...productFormData, status: value })}
+                  disabled={isSubmitting}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
@@ -864,15 +1074,19 @@ const FarmDashboard = () => {
 
               <div className="grid grid-row-1 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="product-category">Category</Label>
+                  <Label htmlFor="product-category">Category *</Label>
                   <Select
                     value={productFormData.category_id || ""}
                     onValueChange={(value) => {
                       setProductFormData({ ...productFormData, category_id: value, sub_category_id: "" });
                       setSelectedCategoryId(value);
+                      if (validationErrors.category) {
+                        setValidationErrors({ ...validationErrors, category: '' });
+                      }
                     }}
+                    disabled={isSubmitting}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className={validationErrors.category ? 'border-red-500' : ''}>
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
                     <SelectContent>
@@ -883,18 +1097,24 @@ const FarmDashboard = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                  {validationErrors.category && (
+                    <p className="text-sm text-red-500">{validationErrors.category}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="product-sub-category">Sub Category</Label>
+                  <Label htmlFor="product-sub-category">Sub Category *</Label>
                   <Select
                     value={productFormData.sub_category_id || ""}
                     onValueChange={(value) => {
                       setProductFormData({ ...productFormData, sub_category_id: value });
+                      if (validationErrors.subCategory) {
+                        setValidationErrors({ ...validationErrors, subCategory: '' });
+                      }
                     }}
-                    disabled={isCustomSubCategory || !productFormData.category_id || availableSubCategories.length === 0}
+                    disabled={isSubmitting || isCustomSubCategory || !productFormData.category_id || availableSubCategories.length === 0}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className={validationErrors.subCategory ? 'border-red-500' : ''}>
                       <SelectValue placeholder={!productFormData.category_id ? "Select category first" : "Select a sub-category"} />
                     </SelectTrigger>
                     <SelectContent>
@@ -905,6 +1125,9 @@ const FarmDashboard = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                  {validationErrors.subCategory && (
+                    <p className="text-sm text-red-500">{validationErrors.subCategory}</p>
+                  )}
 
                   {!isCustomSubCategory ? (
                     <Button
@@ -915,8 +1138,11 @@ const FarmDashboard = () => {
                       onClick={() => {
                         setIsCustomSubCategory(true);
                         setProductFormData({ ...productFormData, sub_category_id: "" });
+                        if (validationErrors.subCategory) {
+                          setValidationErrors({ ...validationErrors, subCategory: '' });
+                        }
                       }}
-                      disabled={!productFormData.category_id}
+                      disabled={isSubmitting || !productFormData.category_id}
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Add Custom Subcategory
@@ -926,9 +1152,19 @@ const FarmDashboard = () => {
                       <Input
                         id="custom-subcategory"
                         value={customSubCategoryName}
-                        onChange={(e) => setCustomSubCategoryName(e.target.value)}
+                        onChange={(e) => {
+                          setCustomSubCategoryName(e.target.value);
+                          if (validationErrors.customSubCategory) {
+                            setValidationErrors({ ...validationErrors, customSubCategory: '' });
+                          }
+                        }}
                         placeholder="Enter custom subcategory name"
+                        disabled={isSubmitting}
+                        className={validationErrors.customSubCategory ? 'border-red-500' : ''}
                       />
+                      {validationErrors.customSubCategory && (
+                        <p className="text-sm text-red-500">{validationErrors.customSubCategory}</p>
+                      )}
                       <div className="flex gap-2">
                         <Button
                           type="button"
@@ -938,7 +1174,12 @@ const FarmDashboard = () => {
                           onClick={() => {
                             setIsCustomSubCategory(false);
                             setCustomSubCategoryName("");
+                            setEditingItem(null);
+                            if (validationErrors.customSubCategoryName) {
+                              setValidationErrors({ ...validationErrors, customSubCategoryName: '' });
+                            }
                           }}
+                          disabled={isSubmitting}
                         >
                           Cancel
                         </Button>
@@ -977,18 +1218,36 @@ const FarmDashboard = () => {
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => {
-                setProductModalOpen(false);
-                setEditingItem(null);
-                setProductFormData({});
-                setSelectedCategoryId("");
-                setIsCustomSubCategory(false);
-                setCustomSubCategoryName("");
-              }}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setProductModalOpen(false);
+                  setEditingItem(null);
+                  setProductFormData({});
+                  setSelectedCategoryId("");
+                  setIsCustomSubCategory(false);
+                  setCustomSubCategoryName("");
+                  setValidationErrors({});
+                }}
+                disabled={isSubmitting}
+              >
                 Cancel
               </Button>
-              <Button onClick={editingItem ? handleUpdateProduct : handleAddProduct}>
-                {editingItem ? 'Update Product' : 'Add Product'}
+              <Button
+                onClick={editingItem ? handleUpdateProduct : handleAddProduct}
+                disabled={isSubmitting || !isFormValid()}
+              >
+                {isSubmitting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {editingItem ? 'Updating...' : 'Adding...'}
+                  </>
+                ) : (
+                  editingItem ? 'Update Product' : 'Add Product'
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
