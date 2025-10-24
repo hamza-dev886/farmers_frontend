@@ -116,9 +116,13 @@ export const Hero = ({
       queryObj.q = searchQuery.trim()
     }
 
-    setSearchParams(queryObj);
-
     if (Object.keys(queryObj).length) {
+      const currentParams = Object.fromEntries(searchParams.entries());
+      setSearchParams({
+        ...currentParams,
+        ...queryObj
+      });
+
       handleSearch();
     }
   };

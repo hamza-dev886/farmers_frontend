@@ -1,22 +1,15 @@
--- Drop existing function if it exists
+-- Updated search function with combined search
 DROP FUNCTION IF EXISTS search_farms_by_distance;
 
-<<<<<<< HEAD
--- Create the updated function with name search
-=======
--- Create the updated function
->>>>>>> 1b67387f2e8c51984e931155f53dd7c1791f709a
 CREATE OR REPLACE FUNCTION search_farms_by_distance(
     user_lat FLOAT,
     user_lon FLOAT,
     max_distance_meters FLOAT DEFAULT NULL,
     farm_types TEXT[] DEFAULT '{}',
-<<<<<<< HEAD
     include_stalls BOOLEAN DEFAULT TRUE,
-    search_query TEXT DEFAULT NULL  -- New parameter for name search
-=======
-    include_stalls BOOLEAN DEFAULT TRUE
->>>>>>> 1b67387f2e8c51984e931155f53dd7c1791f709a
+    search_query TEXT DEFAULT NULL,              -- Combined: Search by farm name, stall name, or product name
+    filter_category_ids UUID[] DEFAULT '{}',     -- Filter by categories
+    filter_sub_category_ids UUID[] DEFAULT '{}'  -- Filter by sub-categories
 )
 RETURNS TABLE (
     id UUID,
@@ -34,12 +27,11 @@ RETURNS TABLE (
     stall_location TEXT,
     record_type TEXT,
     bio TEXT,   
-<<<<<<< HEAD
     logo TEXT,
-=======
-    logo TEXT,                 -- Added missing bio column
->>>>>>> 1b67387f2e8c51984e931155f53dd7c1791f709a
-    distance_meters FLOAT
+    distance_meters FLOAT,
+    product_ids TEXT[],
+    category_ids UUID[],
+    sub_category_ids UUID[]
 ) AS $$
 BEGIN
     RETURN QUERY
@@ -63,7 +55,10 @@ BEGIN
         ST_Distance(
             flv.location_point,
             ST_MakePoint(user_lon, user_lat)::geography
-        ) AS distance_meters
+        ) AS distance_meters,
+        flv.product_ids,
+        flv.category_ids,
+        flv.sub_category_ids
     FROM 
         farm_locations_view flv
     WHERE 
@@ -79,14 +74,30 @@ BEGIN
             )
         )
         -- Optionally exclude stall records
-<<<<<<< HEAD
         AND (include_stalls = TRUE OR flv.record_type != 'stall')
-        -- Search by farm name or stall name (case-insensitive)
+        -- Combined search: farm name, stall name, OR product name
         AND (
             search_query IS NULL 
             OR search_query = ''
             OR flv.name ILIKE '%' || search_query || '%'
             OR flv.stall_name ILIKE '%' || search_query || '%'
+            OR EXISTS (
+                SELECT 1 
+                FROM unnest(flv.product_ids) AS pid
+                JOIN product p ON p.id = pid
+                WHERE p.deleted_at IS NULL 
+                AND p.title ILIKE '%' || search_query || '%'
+            )
+        )
+        -- Filter by categories (farms must have at least one matching category)
+        AND (
+            cardinality(filter_category_ids) = 0
+            OR flv.category_ids && filter_category_ids
+        )
+        -- Filter by sub-categories (farms must have at least one matching sub-category)
+        AND (
+            cardinality(filter_sub_category_ids) = 0
+            OR flv.sub_category_ids && filter_sub_category_ids
         )
     ORDER BY 
         -- Order by relevance (exact matches first), then by distance
@@ -104,12 +115,5 @@ BEGIN
         distance_meters,
         flv.id,
         flv.record_type DESC;
-=======
-        AND (include_stalls = TRUE OR flv.record_type = 'farm')
-    ORDER BY 
-        flv.id,
-        flv.record_type DESC, -- Farm records first, then stalls
-        distance_meters;
->>>>>>> 1b67387f2e8c51984e931155f53dd7c1791f709a
 END;
 $$ LANGUAGE plpgsql;
