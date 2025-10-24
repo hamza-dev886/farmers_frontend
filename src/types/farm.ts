@@ -37,5 +37,7 @@ export type SearchFarmsWithFiltersType = {
         farmTypes?: string[];
         includeStalls?: boolean;
         searchQuery?: string;
+        categoryIds?: string[];
+        subCategoryIds?: string[];
     }
 }

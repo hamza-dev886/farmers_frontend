@@ -1,6 +1,5 @@
-import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useSearchParams } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -18,6 +17,9 @@ interface FilterFormData {
 }
 
 export const FilterSidebar = () => {
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [openSections, setOpenSections] = useState({
     farmType: true,
     products: true,
@@ -114,6 +116,15 @@ export const FilterSidebar = () => {
     e.preventDefault();
     console.log('Filter form data:', formData);
     // Add your filter logic here
+
+
+    const currentParams = Object.fromEntries(searchParams.entries());
+    setSearchParams({
+      ...currentParams,
+      
+    });
+
+
   };
 
   const handleClearAll = () => {
