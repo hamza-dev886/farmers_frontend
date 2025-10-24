@@ -21,6 +21,8 @@ type FetchFarmsFuncType = {
     longitude: number;
     query?: string;
     distance?: number;
+    categories?: string[];
+    subCategories?: string[];
 };
 
 const Index = () => {
@@ -115,6 +117,8 @@ const Index = () => {
         longitude,
         query,
         distance = 100,
+        categories,
+        subCategories,
     }: FetchFarmsFuncType) {
         try {
             setIsLoading(true);
@@ -127,6 +131,8 @@ const Index = () => {
                     farmTypes: ["farm", "stall"],
                     includeStalls: true,
                     searchQuery: query,
+                    categoryIds: categories,
+                    subCategoryIds: subCategories,
                 },
             };
 
@@ -155,6 +161,8 @@ const Index = () => {
             const searchLat = params.get("lat");
             const searchLng = params.get("lng");
             const searchQuery = params.get("q");
+            const categories = params.get("categories");
+            const subCategories = params.get("subCategories")
 
             const latitude = searchLat
                 ? parseFloat(searchLat)
@@ -168,6 +176,8 @@ const Index = () => {
                 longitude: longitude,
                 query: searchQuery,
                 distance: distance,
+                categories: categories?.length ? categories.split(",") : [],
+                subCategories: subCategories?.length ? subCategories.split(",") : [],
             });
             setFarms(farms);
         } catch (error) {
@@ -185,7 +195,7 @@ const Index = () => {
                     {/* Desktop Filters Sidebar - Always visible */}
                     <aside className="hidden lg:block w-64 xl:w-72 flex-shrink-0">
                         <div className="sticky top-24">
-                            <FilterSidebar />
+                            <FilterSidebar handleSubmit={handleSearch} />
                         </div>
                     </aside>
 
@@ -196,7 +206,7 @@ const Index = () => {
                     >
                         <SheetContent side="left" className="w-80 p-0">
                             <div className="p-4">
-                                <FilterSidebar />
+                                <FilterSidebar handleSubmit={handleSearch} />
                             </div>
                         </SheetContent>
                     </Sheet>

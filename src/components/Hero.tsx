@@ -112,13 +112,15 @@ export const Hero = ({
       queryObj.lat = lat;
     }
 
-    if (searchQuery.trim()) {
-      queryObj.q = searchQuery.trim()
-    }
-
-    setSearchParams(queryObj);
+    queryObj.q = searchQuery.trim()
 
     if (Object.keys(queryObj).length) {
+      const currentParams = Object.fromEntries(searchParams.entries());
+      setSearchParams({
+        ...currentParams,
+        ...queryObj
+      });
+
       handleSearch();
     }
   };

@@ -17,7 +17,11 @@ interface FilterFormData {
 }
 import { supabase } from "@/integrations/supabase/client";
 
-export const FilterSidebar = () => {
+type FilterSidebarType = {
+  handleSubmit: () => void;
+}
+
+export const FilterSidebar = ({ handleSubmit: handleSubmitFilters }: FilterSidebarType) => {
 
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -115,17 +119,16 @@ export const FilterSidebar = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Filter form data:', formData);
-    // Add your filter logic here
-
 
     const currentParams = Object.fromEntries(searchParams.entries());
+
     setSearchParams({
       ...currentParams,
-      
+      categories: formData.categories.toString(),
+      subCategories: formData.subCategories.toString(),
     });
 
-
+    handleSubmitFilters();
   };
 
   const handleClearAll = () => {
