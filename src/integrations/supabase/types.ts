@@ -6452,6 +6452,8 @@ export type Database = {
           farm_types?: string[],
           include_stalls?: boolean;
           search_query?: string;
+          filter_category_ids?: string[],
+          filter_sub_category_ids?: string[],
         }
         Returns: FarmMapDBRecord[]
       }
