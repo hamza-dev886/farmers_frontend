@@ -15,6 +15,7 @@ interface FilterFormData {
   distances: string[];
   features: string[];
 }
+import { supabase } from "@/integrations/supabase/client";
 
 export const FilterSidebar = () => {
 
