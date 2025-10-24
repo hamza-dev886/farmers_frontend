@@ -138,7 +138,7 @@ const Auth = () => {
         email: validatedData.email,
         password: validatedData.password,
         options: {
-          emailRedirectTo: `${process.env.VITE_PUBLIC_SITE_URL || "https://farmers-frontend.vercel.app/"}`,
+          emailRedirectTo: `https://farmers-frontend.vercel.app/`,
           data: {
             full_name: validatedData.fullName,
             phone: validatedData.phone || null,
