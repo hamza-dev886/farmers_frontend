@@ -417,10 +417,10 @@ const FarmDashboard = () => {
     }
 
     try {
-      // Create a unique handle from title if not provided
-      const productHandle = productFormData.handle || productFormData.title?.toLowerCase().replace(/\s+/g, '-') || '';
-      // Create product first - the product table requires an ID to be provided
       const productId = crypto.randomUUID();
+      // Create a unique handle from title if not provided
+      const productHandle = productFormData.handle || productFormData.title?.toLowerCase().replace(/\s+/g, '-') + "-" + productId;
+      // Create product first - the product table requires an ID to be provided
       const { data: productData, error: productError } = await supabase
         .from('product')
         .insert({

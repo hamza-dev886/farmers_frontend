@@ -29,6 +29,7 @@ export const MapView = ({ farms, locationCordinates, handleSearch, isLoading }: 
 
   const [searchParams, setSearchParams] = useSearchParams();
   const isUpdatingFromParams = useRef(false);
+  const markerRefs = useRef([]);
 
   // Fetch Mapbox token from config table
   const { data: configData } = useQuery({
@@ -63,7 +64,8 @@ export const MapView = ({ farms, locationCordinates, handleSearch, isLoading }: 
   }, []);
 
   useEffect(() => {
-    if (map.current && farms.length > 0) {
+    if (map.current) {
+      removeAllMarkers();
       addFarmMarkers();
     }
   }, [farms]);
@@ -173,6 +175,11 @@ export const MapView = ({ farms, locationCordinates, handleSearch, isLoading }: 
 
   const debouncedSearch = debounce(handleSearch, 1500);
 
+  const removeAllMarkers = () => {
+    markerRefs.current.forEach(marker => marker.remove());
+    markerRefs.current = []; // Clear the array
+  };
+
   const addFarmMarkers = () => {
     if (!map.current || !farms.length) return;
 
@@ -226,10 +233,12 @@ export const MapView = ({ farms, locationCordinates, handleSearch, isLoading }: 
       `);
 
       // Add marker to map
-      new mapboxgl.Marker(markerElement)
+      const marker = new mapboxgl.Marker(markerElement)
         .setLngLat([lng, lat])
         .setPopup(popup)
         .addTo(map.current!);
+
+      markerRefs.current.push(marker);
     });
   };
 

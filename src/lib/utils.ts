@@ -31,3 +31,10 @@ export function debounce<T extends (...args: any[]) => any>(
         }
     };
 }
+
+export const getDefaultCoordinates = (): { latitude: number; longitude: number} => {
+    return {
+        latitude: 40.7128,
+        longitude: 74.0060,
+    }
+}

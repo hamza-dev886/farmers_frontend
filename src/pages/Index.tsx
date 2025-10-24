@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { useStore } from "@/store/store";
 import { searchFarmsWithFilters } from "@/services/getFarmfromDB";
 import { FarmMapDBRecord, SearchFarmsWithFiltersType } from "@/types/farm";
+import { getDefaultCoordinates } from "@/lib/utils";
 
 type FetchFarmsFuncType = {
     latitude: number;
@@ -34,15 +35,7 @@ const Index = () => {
     const { setLocationCordinates } = useStore((state) => state);
 
     useEffect(() => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(async (position) => {
-                const { latitude, longitude } = position.coords;
-                setLocationCordinates({
-                    lat: latitude,
-                    lng: longitude,
-                });
-            });
-        }
+        getLocationWithFallback();
     }, []);
 
     // Check if user is admin or farmer and redirect
@@ -71,6 +64,7 @@ const Index = () => {
 
     // Load farm on initial load with user's current lcoation
     useEffect(() => {
+        console.log("locationCordinates : ", locationCordinates);
         const loadFarms = async () => {
             const farms = await fetchFarms({
                 latitude: locationCordinates.lat,
@@ -81,6 +75,40 @@ const Index = () => {
 
         loadFarms();
     }, [locationCordinates]);
+
+    const getLocationWithFallback = () => {
+        // First attempt: Network-based location
+        navigator.geolocation.getCurrentPosition(
+            (position) => handleFetchUserLocationSuccess({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+            (error) => {
+                console.log(
+                    "First attempt failed, trying with different settings..."
+                );
+                // Third attempt: Use IP geolocation API as fallback
+                fetch(
+                    "https://api.ipgeolocation.io/ipgeo?apiKey=343a031cd06e40ee990c6b03ad272fac"
+                )
+                    .then((response) => response.json())
+                    .then((data) => {
+                        console.log("User location:", data);
+                        handleFetchUserLocationSuccess(data);
+                    })
+                    .catch((error) => {
+                        console.error("Error fetching user location:", error);
+                        // Defaut to New York
+                        handleFetchUserLocationSuccess(getDefaultCoordinates())
+                    });
+            },
+            { enableHighAccuracy: false, timeout: 5000, maximumAge: 0 }
+        );
+    };
+
+    const handleFetchUserLocationSuccess = ({ latitude, longitude }) => {
+        setLocationCordinates({
+            lat: latitude,
+            lng: longitude,
+        });
+    };
 
     async function fetchFarms({
         latitude,
@@ -128,8 +156,12 @@ const Index = () => {
             const searchLng = params.get("lng");
             const searchQuery = params.get("q");
 
-            const latitude = searchLat ? parseFloat(searchLat) : locationCordinates.lat;
-            const longitude = searchLng ? parseFloat(searchLng) : locationCordinates.lng;
+            const latitude = searchLat
+                ? parseFloat(searchLat)
+                : locationCordinates.lat;
+            const longitude = searchLng
+                ? parseFloat(searchLng)
+                : locationCordinates.lng;
 
             const farms = await fetchFarms({
                 latitude: latitude,
@@ -259,7 +291,8 @@ const Index = () => {
                             </div>
                         </div>
 
-                        {isLoading && (viewMode === "grid" || viewMode === "list") ? (
+                        {isLoading &&
+                        (viewMode === "grid" || viewMode === "list") ? (
                             <div className="flex items-center justify-center py-16">
                                 <div className="text-center">
                                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-farm-green mx-auto mb-4"></div>
@@ -280,9 +313,9 @@ const Index = () => {
                         ) : (
                             <div
                                 className={
-                                  viewMode === "grid"
-                                    ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
-                                    : "grid grid-cols-1 space-y-3"
+                                    viewMode === "grid"
+                                        ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+                                        : "grid grid-cols-1 space-y-3"
                                 }
                             >
                                 {/* Real Farms from Supabase */}
